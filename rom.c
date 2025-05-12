@@ -16,25 +16,28 @@ void print_error(char errormsg[]) {
     exit(EXIT_FAILURE);
 }
 
-void print_header(gbHeader header) {
+
+void print_header(gbRom rom_container) {
     /* print the contents of a gameboy header */
     printf("Header contents:\n");
-    printf("Title:          %s\n", header.title);
-    printf("Licensee (new): %d\n", header.new_licensee);
-    printf("Super Gameboy:  %d\n", header.sgbflag);
-    printf("Cartrige Type:  %d\n", header.carttype);
-    printf("ROM Size Code:  %d\n", header.romsize);
-    printf("RAM Size Code:  %d\n", header.ramsize);
-    printf("Global Release: %d\n", header.locale);
-    printf("Licensee (old): %d\n", header.old_licensee);
-    printf("Version:        %d\n", header.version);
+    printf("Title:          %s\n", rom_container.title);
+    printf("Licensee (new): %d\n", rom_container.new_licensee);
+    printf("Super Gameboy:  %d\n", rom_container.sgbflag);
+    printf("Cartrige Type:  %d\n", rom_container.carttype);
+    printf("ROM Size Code:  %d\n", rom_container.romsize);
+    printf("RAM Size Code:  %d\n", rom_container.ramsize);
+    printf("Global Release: %d\n", rom_container.locale);
+    printf("Licensee (old): %d\n", rom_container.old_licensee);
+    printf("Version:        %d\n", rom_container.version);
 }
+
 
 int decode_rom_size(uint8_t romcode) {
     /* Decode the rom size indicated in a gameboy header, returns the number of bytes */
     if (romcode > 7) print_error("Unable to decode rom size.");
     return 1<<(romcode+15); //0 means 32K, 1 means 64k and so on.
 }
+
 
 int decode_ram_size(uint8_t ramcode) {
     /* Decode the ram size indicated in a gameboy header, returns the number of bytes */
@@ -58,30 +61,38 @@ int decode_ram_size(uint8_t ramcode) {
     }
 }
 
-gbHeader read_rom_header(FILE* romfile) {
-    /* read a gameboy rom and return the rom header */
-    gbHeader header;
+
+gbRom init_rom(FILE* romfile) {
+    /* read a gameboy rom to process the header and load the rom contents into memory */
+    gbRom rom_container;
     int read_errors = 0;
     fseek(romfile, HEADER_START, SEEK_SET);
-    read_errors += 16!=fread(&header.title, 1, 16, romfile);
-    read_errors += 1!=fread(&header.new_licensee, 2, 1, romfile);
+    read_errors += 16!=fread(&rom_container.title, 1, 16, romfile);
+    read_errors += 1!=fread(&rom_container.new_licensee, 2, 1, romfile);
 
     uint8_t sgbflag;
     read_errors += 1!=fread(&sgbflag, 1, 1, romfile);
-    header.sgbflag = sgbflag==0x03;
+    rom_container.sgbflag = sgbflag==0x03;
 
-    read_errors += 1!=fread(&header.carttype, 1, 1, romfile);
+    read_errors += 1!=fread(&rom_container.carttype, 1, 1, romfile);
 
     uint8_t romcode;
     uint8_t ramcode;
     read_errors += 1!=fread(&romcode, 1, 1, romfile);
     read_errors += 1!=fread(&ramcode, 1, 1, romfile);
-    header.romsize = decode_rom_size(romcode);
-    header.ramsize = decode_ram_size(ramcode);
+    rom_container.romsize = decode_rom_size(romcode);
+    rom_container.ramsize = decode_ram_size(ramcode);
 
-    read_errors += 1!=fread(&header.locale, 1, 1, romfile);
-    read_errors += 1!=fread(&header.old_licensee, 1, 1, romfile);
-    read_errors += 1!=fread(&header.version, 1, 1, romfile);
+    rom_container.rom = malloc(rom_container.romsize);
+    if (rom_container.ramsize) {
+        rom_container.ram = malloc(rom_container.ramsize);
+    } else {
+        rom_container.ram = 0;
+    }
+
+    read_errors += 1!=fread(&rom_container.locale, 1, 1, romfile);
+    read_errors += 1!=fread(&rom_container.old_licensee, 1, 1, romfile);
+    read_errors += 1!=fread(&rom_container.version, 1, 1, romfile);
     uint8_t checksum;
     read_errors += 1!=fread(&checksum, 1, 1, romfile);
     if (read_errors) print_error("Unable to read header: EOF.");
@@ -90,61 +101,34 @@ gbHeader read_rom_header(FILE* romfile) {
     uint8_t raw_header[HEADER_SIZE];
     fseek(romfile, HEADER_START, SEEK_SET);
     fread(raw_header, 1, HEADER_SIZE, romfile);
-    printf("%d\n",checksum);
     for (uint8_t i=0; i<HEADER_SIZE; i++) {
         checksum += raw_header[i]+1;
     }
     if (checksum) print_error("Header Checksum is invalid!");
 
-    print_header(header);
-    return header;
+    print_header(rom_container);
+    return rom_container;
 }
 
 
-void load_rom(char filename[]) {
+gbRom load_rom(char filename[]) {
 	/* Read a rom file and load contents */
     printf("Attempting to load rom file %s\n", filename);
-	FILE *f;
-	f = fopen(filename, "rb");
-	if (f == NULL) {
+	FILE *romfile;
+	romfile = fopen(filename, "rb");
+	if (romfile == NULL) {
 		print_error("File is empty.");
 	}
 	
-    read_rom_header(f);
+    gbRom rom_container = init_rom(romfile);
 
-	// unsigned char header[HEADER_SIZE];
-	// fread(header, HEADER_SIZE, 1, f);
-	// if (!check_header(header)) return 2;
-	
-	// int c;
-	// while (!(max_graphs == 0) && (c = fgetc(f)) != EOF) {
+        //load rom into memory
+    fseek(romfile, 0, SEEK_SET);
+    int bytes_read = fread(rom_container.rom, 1, rom_container.romsize, romfile);
+    if (bytes_read != rom_container.romsize) print_error("Unable to load rom file.");
 
-	// 	order = (uint8_t)c;
-		
-	// 	uint8_t graph[order][order];
-	// 	for (uint8_t i=0; i<order; i++) {
-	// 		for (uint8_t j=0; j<order; j++) {
-	// 			graph[i][j] = 0;
-	// 		}
-	// 		int go = 1;
-	// 		do {
-	// 			uint8_t c = fgetc(f);
-	// 			if (c) {
-	// 				graph[i][c-1] = 1;
-	// 			} else {
-	// 				go = 0;
-	// 			}
-	// 		} while (go);
-	// 	}
-		
-	// 	print_graph((uint8_t *)graph);
-		
-	// 	uint64_t vertices = 1ULL;
-	// 	int parents[order];
-	// 	get_ham_cycles(*graph, 0, vertices, parents, 1);
-	// 	if (max_graphs > 0) max_graphs--;
-		
-	// }
-	fclose(f);
-	// return 0;
+    printf("Successfully loaded rom file.\n");
+
+	fclose(romfile);
+    return rom_container;
 }

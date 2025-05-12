@@ -17,16 +17,19 @@ typedef struct {
     uint8_t sgbflag;
     uint8_t carttype;
     int romsize;
+    uint8_t* rom;
     int ramsize;
+    uint8_t* ram;
     uint8_t locale;
     uint8_t old_licensee;
     uint8_t version;
-} gbHeader;
+} gbRom;
 
-void print_header(gbHeader header);
+gbRom init_rom(FILE* romfile);
+void print_header(gbRom header);
 void print_error(char errormsg[]);
 int decode_rom_size(uint8_t romcode);
 int decode_ram_size(uint8_t ramcode);
-void load_rom(char filename[]);
+gbRom load_rom(char filename[]);
 
 #endif // ROM_H

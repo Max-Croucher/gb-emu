@@ -11,6 +11,6 @@
 #include "rom.h"
 
 int main(int argc, char *argv[]) {
-    load_rom(argv[1]);
+    gbRom rom = load_rom(argv[1]);
     return 0;
 }
