@@ -7,7 +7,6 @@
 #ifndef ROM_H
 #define ROM_H
 
-#define PROG_START 0x0100
 #define HEADER_START 0x0134
 #define HEADER_SIZE 25
 
