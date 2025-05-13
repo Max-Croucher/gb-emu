@@ -15,8 +15,47 @@
 uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b00 */
     uint8_t offset_pc = 0;
-    uint16_t imm16;
-    uint8_t imm8;
+    uint16_t working16bit;
+    uint8_t working8bit;
+    uint8_t has_finished = 1;
+    //explicit 8-bit opcodes
+    switch (opcode)
+    {
+    case 0b00001000: //LD [imm16], SP | load bytes in SP to the bytes pointed to by address [r16] and [r16+1]
+        offset_pc = 3;
+        memcpy(&working16bit, ram+(*reg).PC+1, 2);
+        printf("Got %.4x\n", working16bit);
+        memcpy(ram+working16bit, &(*reg).SP, 2);
+        break;
+    case 0b00000111: //RLCA | bit-shift rotate register A left, store wraparound into C
+        offset_pc = 1;
+        set_flag(reg, CFLAG, get_r8(reg, R8A)>>7);
+        working8bit = (get_r8(reg, R8A) << 1) + get_flag(reg, CFLAG);
+        set_r8(reg, R8A, working8bit);
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        break;
+    case 0b00001111: //RRCA | bit-shift rotate register A right, store wraparound into C
+        offset_pc = 1;
+        set_flag(reg, CFLAG, get_r8(reg, R8A)&1);
+        working8bit = (get_r8(reg, R8A) >> 1) + (get_flag(reg, CFLAG)<<7);
+        set_r8(reg, R8A, working8bit);
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        break;
+
+
+
+
+
+
+    default:
+        has_finished = 0;
+    }
+    if (has_finished) return offset_pc;
+    //implicit opcodes, controlled by mask 0b00001111
     switch (opcode & 0xF)
     {
     case 0: //NOP
@@ -24,8 +63,8 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 1: //LD r16, imm16 | load 16 bit value imm16 into r16
         offset_pc = 3;
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
-        set_r16(reg, (opcode>>4)&3, imm16);
+        memcpy(&working16bit, ram+(*reg).PC+1, 2);
+        set_r16(reg, (opcode>>4)&3, working16bit);
         break;
     case 2: //LD [r16], A | load contents of r8A to the byte pointed to by [r16]
         offset_pc = 1;
@@ -34,12 +73,6 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 10: //LD A, [r16] | load byte pointed to by address [r16] into LDA
         offset_pc = 1;
         set_r8(reg, R8A, *(ram+get_r16(reg, (opcode>>4)&3)));
-        break;
-    case 8: //LD [imm16], SP | load bytes in SP to the bytes pointed to by address [r16] and [r16+1]
-        offset_pc = 3;
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
-        printf("Got %.4x\n", imm16);
-        memcpy(ram+imm16, &(*reg).SP, 2);
         break;
     case 3: //INC r16 | increment r16
         offset_pc = 1;
@@ -58,7 +91,7 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, (old_hl&0x0FFF)+(get_r16(reg, (opcode>>4)&3)&0x0FFF)>=0x1000);
         break;
     case 4:
-    case 12: // INC r8 | increment r8
+    case 12: //INC r8 | increment r8
         offset_pc = 1;
         set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)+1);
         set_flag(reg, NFLAG, 0);
@@ -66,12 +99,18 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==16);
         break;
     case 5:
-    case 13: // DEC r8 | decrement r8
+    case 13: //DEC r8 | decrement r8
         offset_pc = 1;
         set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)-1);
         set_flag(reg, NFLAG, 1);
         set_flag(reg, ZFLAG, get_r8(reg, (opcode>>3)&7)==0);
         set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==15);
+        break;
+    case 6:
+    case 14: //LD r8, imm8 | load value imm8 into r8
+        offset_pc = 2;
+        memcpy(&working8bit, ram+(*reg).PC+1, 1);
+        set_r8(reg, (opcode>>3)&7, working8bit);
         break;
         
     default:; //Unknown opcode
@@ -88,8 +127,8 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
 uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b01 */
     uint8_t offset_pc = 0;
-    uint16_t imm16;
-    uint8_t imm8;
+    uint16_t working16bit;
+    uint8_t working8bit;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -101,8 +140,8 @@ uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
 uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b10 */
     uint8_t offset_pc = 0;
-    uint16_t imm16;
-    uint8_t imm8;
+    uint16_t working16bit;
+    uint8_t working8bit;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -114,8 +153,8 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
 uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b11 */
     uint8_t offset_pc = 0;
-    uint16_t imm16;
-    uint8_t imm8;
+    uint16_t working16bit;
+    uint8_t working8bit;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -156,11 +195,16 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    set_r8(&reg, R8A, 1);
-    *(ram+(reg).PC) = 0b00111101;
-    *(ram+(reg).PC+1) = 0b00111101;
-    *(ram+(reg).PC+2) = 0b00111101;
-    *(ram+(reg).PC+3) = 0b00111101;
+    set_r8(&reg, R8A, 0x05);
+    *(ram+(reg).PC) = 0b00001111;
+    *(ram+(reg).PC+1) = 0b00001111;
+    *(ram+(reg).PC+2) = 0b00001111;
+    *(ram+(reg).PC+3) = 0b00001111;
+    *(ram+(reg).PC+4) = 0b00001111;
+    *(ram+(reg).PC+5) = 0b00001111;
+    *(ram+(reg).PC+6) = 0b00001111;
+    *(ram+(reg).PC+7) = 0b00001111;
+    *(ram+(reg).PC+8) = 0b00001111;
 
 
     for (int i=0; i<10; i++) {
