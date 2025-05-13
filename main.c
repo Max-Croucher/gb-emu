@@ -41,8 +41,39 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         printf("Got %.4x\n", imm16);
         memcpy(ram+imm16, &(*reg).SP, 2);
         break;
-
-
+    case 3: //INC r16 | increment r16
+        offset_pc = 1;
+        set_r16(reg, (opcode>>4)&3, get_r16(reg,(opcode>>4)&3)+1);
+        break;
+    case 11: //DEC r16 | decrement r16
+        offset_pc = 1;
+        set_r16(reg, (opcode>>4)&3, get_r16(reg,(opcode>>4)&3)-1);
+        break;
+    case 9: //ADD HL, r16 | add value in r16 to HL
+        offset_pc = 1;
+        uint16_t old_hl = get_r16(reg, R16HL);
+        set_r16(reg, R16HL,old_hl+get_r16(reg, (opcode>>4)&3));
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, get_r16(reg, R16HL)<old_hl);
+        set_flag(reg, HFLAG, (old_hl&0x0FFF)+(get_r16(reg, (opcode>>4)&3)&0x0FFF)>=0x1000);
+        break;
+    case 4:
+    case 12: // INC r8 | increment r8
+        offset_pc = 1;
+        set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)+1);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, ZFLAG, get_r8(reg, (opcode>>3)&7)==0);
+        set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==16);
+        break;
+    case 5:
+    case 13: // DEC r8 | decrement r8
+        offset_pc = 1;
+        set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)-1);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, ZFLAG, get_r8(reg, (opcode>>3)&7)==0);
+        set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==15);
+        break;
+        
     default:; //Unknown opcode
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
@@ -125,12 +156,11 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    // set_r8(&reg, R8A, 127);
-    // set_r16(&reg, R16DE, 0x0103);
-    // set_r16(&reg, R16BC, 0x0104);
-    // *(ram+(reg).PC) = 0b00010010;
-    // *(ram+(reg).PC+1) = 0b00000010;
-    // *(ram+(reg).PC+2) = 0b00100001;
+    set_r8(&reg, R8A, 1);
+    *(ram+(reg).PC) = 0b00111101;
+    *(ram+(reg).PC+1) = 0b00111101;
+    *(ram+(reg).PC+2) = 0b00111101;
+    *(ram+(reg).PC+3) = 0b00111101;
 
 
     for (int i=0; i<10; i++) {
