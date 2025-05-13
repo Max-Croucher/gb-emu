@@ -30,5 +30,6 @@ void print_error(char errormsg[]);
 int decode_rom_size(uint8_t romcode);
 int decode_ram_size(uint8_t ramcode);
 gbRom load_rom(char filename[]);
+uint8_t* init_ram(gbRom *rom);
 
 #endif // ROM_H

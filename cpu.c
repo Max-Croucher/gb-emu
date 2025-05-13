@@ -19,13 +19,13 @@ Registers init_registers(void) {
 
 void print_registers(Registers *reg) {
     /* Print a textual representation of the current CPU registers */
-    printf("CPU State:\n");
-    printf("A : 0x%.2x\n", (*reg).AF>>8);
-    printf("Z N H C: %d %d %d %d\n", get_flag(reg, ZFLAG), get_flag(reg, NFLAG), get_flag(reg, HFLAG), get_flag(reg, CFLAG));
+    printf("\nCPU State:   ");
+    printf("ZNHC: %d%d%d%d\n", get_flag(reg, ZFLAG), get_flag(reg, NFLAG), get_flag(reg, HFLAG), get_flag(reg, CFLAG));
+    printf("A : 0x%.2x     ", (*reg).AF>>8);
     printf("BC: 0x%.4x\n", (*reg).BC);
-    printf("DE: 0x%.4x\n", (*reg).DE);
+    printf("DE: 0x%.4x   ", (*reg).DE);
     printf("HL: 0x%.4x\n", (*reg).HL);
-    printf("SP: 0x%.4x\n", (*reg).SP);
+    printf("SP: 0x%.4x   ", (*reg).SP);
     printf("PC: 0x%.4x\n", (*reg).PC);
 }
 

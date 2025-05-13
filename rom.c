@@ -132,3 +132,11 @@ gbRom load_rom(char filename[]) {
 	fclose(romfile);
     return rom_container;
 }
+
+
+uint8_t* init_ram(gbRom *rom) {
+    /* Initialise the gameboy RAM, loading the first 32K of rom at 0x0000 */
+    uint8_t *ram = malloc(0x10000);
+    memcpy(ram, (*rom).rom, 0x8000);
+    return ram;
+}
