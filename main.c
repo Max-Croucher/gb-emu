@@ -16,7 +16,9 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b00 */
     uint8_t offset_pc = 0;
     uint16_t working16bit;
+    uint16_t imm16;
     uint8_t working8bit;
+    uint8_t imm8;
     bool workingflag;
     uint8_t has_finished = 1;
     //explicit 8-bit opcodes
@@ -24,9 +26,9 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0b00001000: //LD [imm16], SP | load bytes in SP to the bytes pointed to by address [r16] and [r16+1]
         offset_pc = 3;
-        memcpy(&working16bit, ram+(*reg).PC+1, 2);
-        printf("Got %.4x\n", working16bit);
-        memcpy(ram+working16bit, &(*reg).SP, 2);
+        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        printf("Got %.4x\n", imm16);
+        memcpy(ram+imm16, &(*reg).SP, 2);
         break;
     case 0b00000111: //RLCA | bit-shift rotate register A left, store wraparound into C
         offset_pc = 1;
@@ -132,8 +134,8 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 1: //LD r16, imm16 | load 16 bit value imm16 into r16
         offset_pc = 3;
-        memcpy(&working16bit, ram+(*reg).PC+1, 2);
-        set_r16(reg, (opcode>>4)&3, working16bit);
+        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        set_r16(reg, (opcode>>4)&3, imm16);
         break;
     case 2: //LD [r16], A | load contents of r8A to the byte pointed to by [r16]
         offset_pc = 1;
@@ -178,8 +180,8 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 6:
     case 14: //LD r8, imm8 | load value imm8 into r8
         offset_pc = 2;
-        memcpy(&working8bit, ram+(*reg).PC+1, 1);
-        set_r8(reg, (opcode>>3)&7, working8bit);
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r8(reg, (opcode>>3)&7, imm8);
         break;
         
     default:; //Unknown opcode
@@ -197,8 +199,11 @@ uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b01 */
     uint8_t offset_pc = 0;
     uint16_t working16bit;
+    uint16_t imm16;
     uint8_t working8bit;
+    uint8_t imm8;
     bool workingflag;
+    uint8_t has_finished = 1;
 
     if (opcode == 0b01110110) { //HALT
         print_error("STOP is not implemented!");
@@ -214,8 +219,11 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b10 */
     uint8_t offset_pc = 0;
     uint16_t working16bit;
+    uint16_t imm16;
     uint8_t working8bit;
+    uint8_t imm8;
     bool workingflag;
+    uint8_t has_finished = 1;
 
     switch ((opcode>>3)&7)
     {
@@ -305,13 +313,124 @@ uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b11 */
     uint8_t offset_pc = 0;
     uint16_t working16bit;
+    uint16_t imm16;
     uint8_t working8bit;
+    uint8_t imm8;
     bool workingflag;
+    uint8_t has_finished = 1;
+
+    switch (opcode)
+    {
+    case 0b11000110: //ADD A, imm8 | add contents of imm8 to A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r8(reg, R8A, get_r8(reg, R8A) + imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)<imm8);
+        set_flag(reg, HFLAG, (get_r8(reg, R8A)&15)<(imm8&15));
+        break;
+    case 0b11001110: //ADC A, imm8 | add carry and contents of imm8 to A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        working16bit = get_r8(reg, R8A) + imm8 + get_flag(reg, CFLAG);
+        working8bit = get_r8(reg, R8A)&15 + (imm8&15) + get_flag(reg, CFLAG);
+        set_r8(reg, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
+        break;
+    case 0b11010110: //SUB A, imm8 | subtract contents of imm8 from A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        working16bit = get_r8(reg, R8A) - imm8;
+        working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
+        set_r8(reg, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
+        break;
+    case 0b11011110: //SBC A, imm8 | subtract carry and contents of imm8 to A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        working16bit = get_r8(reg, R8A) - imm8 - get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, R8A)&15) - (imm8&15) - get_flag(reg, CFLAG);
+        set_r8(reg, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
+        break;
+    case 0b11100110: //AND A, imm8 | logical and between imm8 and A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r8(reg, R8A, get_r8(reg, R8A) & imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 1);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 0b11101110: //XOR A, imm8 | logical xor between imm8 and A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r8(reg, R8A, get_r8(reg, R8A) ^ imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 0b11110110: //OR A, imm8 | logical or between imm8 and A
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r8(reg, R8A, get_r8(reg, R8A) | imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 0b11111110: //CP A, imm8 | subtract contents of imm8 from A but discard result
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        working16bit = get_r8(reg, R8A) - imm8;
+        working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
+        break;
+    case 0b11000000:
+    case 0b11001000:
+    case 0b11010000:
+    case 0b11011000: //RET cond | conditional return
+        if (is_cc(reg, (opcode>>3)&3)) {
+            offset_pc = 0;
+            memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+            (*reg).SP+=2;
+        } else {
+            offset_pc = 1;
+        }
+        break;
+    case 0b11001001: //RET | return
+        offset_pc = 0;
+        memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+        (*reg).SP+=2;
+        break;
+    case 0b11011001: //RETI | return and enable IME
+        offset_pc = 0;
+        memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+        (*reg).SP+=2;
+        set_ime(reg, 1);
+        break;
+    default:;
+        bool workingflag;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
             (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
         print_error(buf);
+    }
     return offset_pc;
 }
 
@@ -347,10 +466,10 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    set_flag(&reg, CFLAG, 1);
-    set_r8(&reg, R8A, 0x54);
-    set_r8(&reg, R8H, 0x64);
-    *(ram+(reg).PC) = 0b10111100;
+    set_r16(&reg, R16SP, 0xf000);
+    *(ram+(reg).SP) = 0xab;
+    *(ram+(reg).SP+1) = 0xcd;
+    *(ram+(reg).PC) = 0b11011000;
 
     for (int i=0; i<10; i++) {
         run_instruction(&rom, ram, &reg);
