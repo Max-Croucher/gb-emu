@@ -37,6 +37,7 @@ typedef struct {
 #define R16HL 2
 #define R16SP 3
 #define R16PC 4
+#define R16AF 5
 
 Registers init_registers(void);
 void print_registers(Registers *reg);

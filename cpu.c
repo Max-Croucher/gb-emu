@@ -118,6 +118,8 @@ uint16_t get_r16(Registers *reg, uint16_t regname) {
         return (*reg).SP;
     case R16PC:
         return (*reg).PC;
+    case R16AF:
+        return (*reg).AF;
     default:
         return 0;
     }
@@ -170,4 +172,22 @@ bool is_cc(Registers *reg, uint8_t cond) {
 void set_ime(Registers *reg, bool state) {
     /* set the Interrupt Master Enable */
     (*reg).IME = state;
+}
+
+uint8_t decode_r16stk(uint8_t code) {
+    /* decode the r16stk code into a usable register */
+    switch (code)
+    {
+    case 0:
+        return R16BC;
+    case 1:
+        return R16DE;
+    case 2:
+        return R16HL;
+    case 3:
+        return R16AF;
+    
+    default:
+        fprintf(stderr, "Error: Unknown r16stk code!");
+    }
 }
