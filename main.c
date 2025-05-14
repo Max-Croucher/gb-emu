@@ -46,8 +46,6 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
-    /************************************************************************************************/
-    //TEST ME
     case 0b00010111: //RLA | bit-shift rotate register A left, through C
         offset_pc = 1;
         workingflag = get_flag(reg, CFLAG);
@@ -68,6 +66,8 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
+    /************************************************************************************************/
+    //TEST ME
     case 0b00100111: //DAA | Decimal adjust accumulator
         offset_pc = 1;
         uint8_t daa_adj = 0;
@@ -76,13 +76,13 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
             if (get_flag(reg, CFLAG)) daa_adj+= 0x60;
             set_r8(reg, R8A, get_r8(reg, R8A) - daa_adj);
         } else {
-            if (get_flag(reg, HFLAG) && get_r8(reg, R8A)&0x0F>0x09) daa_adj+= 0x06;
-            if (get_flag(reg, CFLAG) && get_r8(reg, R8A)>0x99) {daa_adj+= 0x60; set_flag(reg, CFLAG, 1);}
+            if (get_flag(reg, HFLAG) || (get_r8(reg, R8A)&0x0F)>0x09) daa_adj+= 0x06;
+            if (get_flag(reg, CFLAG) || get_r8(reg, R8A)>0x99) {daa_adj+= 0x60; set_flag(reg, CFLAG, 1);}
             set_r8(reg, R8A, get_r8(reg, R8A) + daa_adj);
         }
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, HFLAG, 0);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)>0x99);
+        set_flag(reg, CFLAG, get_flag(reg, CFLAG) || get_r8(reg, R8A)>0x99);
         break;
     case 0b00101111: //CPL | bitwise not
         offset_pc = 1;
@@ -201,11 +201,15 @@ uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint16_t working16bit;
     uint8_t working8bit;
     bool workingflag;
-        char buf[64];
-        sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
-            (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
-            (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
-        print_error(buf);
+
+
+    if (opcode == 0b01110110) { //HALT
+        print_error("STOP is not implemented!");
+    } else { //LD r8, r8 | load r8 into r8
+        offset_pc = 1;
+        set_r8(reg, (opcode>>3)&7, get_r8(reg, opcode&7));
+    }
+
     return offset_pc;
 }
 
@@ -215,11 +219,86 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint16_t working16bit;
     uint8_t working8bit;
     bool workingflag;
+
+
+    switch ((opcode>>3)&7)
+    {
+    case 0: //ADD A, r8 | add contents of r8 to A
+        offset_pc = 1;
+        set_r8(reg, R8A, get_r8(reg, R8A) + get_r8(reg, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)<get_r8(reg, opcode&7));
+        set_flag(reg, HFLAG, get_r8(reg, R8A)&15<get_r8(reg, opcode&7)&15);
+        break;
+    case 1: //ADC A, r8 | add carry and contents of r8 to A
+        offset_pc = 1;
+        working16bit = get_r8(reg, R8A) + get_r8(reg, opcode&7) + get_flag(reg, CFLAG);
+        working8bit = get_r8(reg, R8A) + get_r8(reg, opcode&7)&15 + get_flag(reg, CFLAG);
+        set_r8(reg, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, working16bit>>8);
+        set_flag(reg, HFLAG, working8bit>>4);
+        break;
+    case 2: //SUB A, r8 | subtract contents of r8 from A
+        offset_pc = 1;
+        set_r8(reg, R8A, get_r8(reg, R8A) - get_r8(reg, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)>get_r8(reg, opcode&7));
+        set_flag(reg, HFLAG, get_r8(reg, R8A)&15>get_r8(reg, opcode&7)&15);
+        break;
+    case 3: //SBC A, r8 | subtract carry and contents of r8 to A
+        offset_pc = 1;
+        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7) - get_flag(reg, CFLAG);
+        working8bit = get_r8(reg, R8A) - get_r8(reg, opcode&7)&15 - get_flag(reg, CFLAG);
+        set_r8(reg, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
+        break;
+    case 4: //AND A, r8 | logical and between r8 and A
+        offset_pc = 1;
+        set_r8(reg, R8A, get_r8(reg, R8A) & get_r8(reg, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 1);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 5: //XOR A, r8 | logical xor between r8 and A
+        offset_pc = 1;
+        set_r8(reg, R8A, get_r8(reg, R8A) ^ get_r8(reg, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 6: //OR A, r8 | logical or between r8 and A
+        offset_pc = 1;
+        set_r8(reg, R8A, get_r8(reg, R8A) | get_r8(reg, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, 0);
+        break;
+    case 7: //CP A, r8 | subtract contents of r8 from A but discard result
+        offset_pc = 1;
+        working8bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
+        set_flag(reg, ZFLAG, working8bit==0);
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)<get_r8(reg, opcode&7));
+        set_flag(reg, HFLAG, get_r8(reg, R8A)&15<get_r8(reg, opcode&7)&15);
+        break;
+    default:;
+        bool workingflag;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
             (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
         print_error(buf);
+    }
     return offset_pc;
 }
 
@@ -269,16 +348,9 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    set_r8(&reg, R8A, 0x05);
-    *(ram+(reg).PC) = 0b00010111;
-    *(ram+(reg).PC+1) = 0b00010111;
-    *(ram+(reg).PC+2) = 0b00010111;
-    *(ram+(reg).PC+3) = 0b00010111;
-    *(ram+(reg).PC+4) = 0b00010111;
-    *(ram+(reg).PC+5) = 0b00010111;
-    *(ram+(reg).PC+6) = 0b00010111;
-    *(ram+(reg).PC+7) = 0b00010111;
-    *(ram+(reg).PC+8) = 0b00010111;
+    set_r8(&reg, R8A, 0x80 + 0x31);
+    set_flag(&reg, HFLAG, 0);
+    *(ram+(reg).PC) = 0b00100111;
 
 
     for (int i=0; i<10; i++) {
