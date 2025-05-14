@@ -19,13 +19,13 @@ Registers init_registers(void) {
 
 void print_registers(Registers *reg) {
     /* Print a textual representation of the current CPU registers */
-    printf("\nCPU State:   ");
-    printf("ZNHC: %d%d%d%d\n", get_flag(reg, ZFLAG), get_flag(reg, NFLAG), get_flag(reg, HFLAG), get_flag(reg, CFLAG));
-    printf("A : 0x%.2x     ", (*reg).AF>>8);
+    printf("\nCPU State:  ");
+    printf("ZNHCI: %d%d%d%d%d\n", get_flag(reg, ZFLAG), get_flag(reg, NFLAG), get_flag(reg, HFLAG), get_flag(reg, CFLAG), (*reg).IME);
+    printf("A : 0x%.2x      ", (*reg).AF>>8);
     printf("BC: 0x%.4x\n", (*reg).BC);
-    printf("DE: 0x%.4x   ", (*reg).DE);
+    printf("DE: 0x%.4x    ", (*reg).DE);
     printf("HL: 0x%.4x\n", (*reg).HL);
-    printf("SP: 0x%.4x   ", (*reg).SP);
+    printf("SP: 0x%.4x    ", (*reg).SP);
     printf("PC: 0x%.4x\n", (*reg).PC);
 }
 
@@ -164,4 +164,10 @@ bool is_cc(Registers *reg, uint8_t cond) {
         fprintf(stderr, "Error: Unknown condition code!");
         exit(EXIT_FAILURE);
     }
+}
+
+
+void set_ime(Registers *reg, bool state) {
+    /* set the Interrupt Master Enable */
+    (*reg).IME = state;
 }

@@ -14,6 +14,7 @@ typedef struct {
     uint16_t HL;
     uint16_t SP;
     uint16_t PC;
+    bool IME;
 } Registers;
 
 #define PROG_START 0x0100
@@ -46,5 +47,6 @@ void set_r8(Registers *reg, uint8_t regname, uint8_t value);
 uint16_t get_r16(Registers *reg, uint16_t regname);
 void set_r16(Registers *reg, uint16_t regname, uint16_t value);
 bool is_cc(Registers *reg, uint8_t cond);
+void set_ime(Registers *reg, bool state);
 
 #endif // CPU_H
