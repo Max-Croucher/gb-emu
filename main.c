@@ -66,8 +66,6 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
-    /************************************************************************************************/
-    //TEST ME
     case 0b00100111: //DAA | Decimal adjust accumulator
         offset_pc = 1;
         uint8_t daa_adj = 0;
@@ -86,7 +84,7 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b00101111: //CPL | bitwise not
         offset_pc = 1;
-        set_flag(reg, R8A, ~get_flag(reg, R8A));
+        set_r8(reg, R8A, ~get_r8(reg, R8A));
         set_flag(reg, NFLAG, 1);
         set_flag(reg, HFLAG, 1);
         break;
@@ -100,7 +98,7 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         offset_pc = 1;
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
-        set_flag(reg, CFLAG, ~get_flag(reg, CFLAG));
+        set_flag(reg, CFLAG, !get_flag(reg, CFLAG));
         break;
     case 0b00011000: //jr imm8 | relative jump to SIGNED byte in imm8
         offset_pc = 0;
@@ -202,7 +200,6 @@ uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t working8bit;
     bool workingflag;
 
-
     if (opcode == 0b01110110) { //HALT
         print_error("STOP is not implemented!");
     } else { //LD r8, r8 | load r8 into r8
@@ -220,7 +217,6 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t working8bit;
     bool workingflag;
 
-
     switch ((opcode>>3)&7)
     {
     case 0: //ADD A, r8 | add contents of r8 to A
@@ -229,33 +225,35 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, CFLAG, get_r8(reg, R8A)<get_r8(reg, opcode&7));
-        set_flag(reg, HFLAG, get_r8(reg, R8A)&15<get_r8(reg, opcode&7)&15);
+        set_flag(reg, HFLAG, (get_r8(reg, R8A)&15)<(get_r8(reg, opcode&7)&15));
         break;
     case 1: //ADC A, r8 | add carry and contents of r8 to A
         offset_pc = 1;
         working16bit = get_r8(reg, R8A) + get_r8(reg, opcode&7) + get_flag(reg, CFLAG);
-        working8bit = get_r8(reg, R8A) + get_r8(reg, opcode&7)&15 + get_flag(reg, CFLAG);
+        working8bit = get_r8(reg, R8A)&15 + (get_r8(reg, opcode&7)&15) + get_flag(reg, CFLAG);
         set_r8(reg, R8A, (uint8_t)working16bit);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
-        set_flag(reg, CFLAG, working16bit>>8);
-        set_flag(reg, HFLAG, working8bit>>4);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 2: //SUB A, r8 | subtract contents of r8 from A
         offset_pc = 1;
-        set_r8(reg, R8A, get_r8(reg, R8A) - get_r8(reg, opcode&7));
+        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
+        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15);
+        set_r8(reg, R8A, (uint8_t)working16bit);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 1);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)>get_r8(reg, opcode&7));
-        set_flag(reg, HFLAG, get_r8(reg, R8A)&15>get_r8(reg, opcode&7)&15);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 3: //SBC A, r8 | subtract carry and contents of r8 to A
         offset_pc = 1;
         working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7) - get_flag(reg, CFLAG);
-        working8bit = get_r8(reg, R8A) - get_r8(reg, opcode&7)&15 - get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15) - get_flag(reg, CFLAG);
         set_r8(reg, R8A, (uint8_t)working16bit);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
-        set_flag(reg, NFLAG, 0);
+        set_flag(reg, NFLAG, 1);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
@@ -285,11 +283,12 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 7: //CP A, r8 | subtract contents of r8 from A but discard result
         offset_pc = 1;
-        working8bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
-        set_flag(reg, ZFLAG, working8bit==0);
+        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
+        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15);
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 1);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)<get_r8(reg, opcode&7));
-        set_flag(reg, HFLAG, get_r8(reg, R8A)&15<get_r8(reg, opcode&7)&15);
+        set_flag(reg, CFLAG, working16bit>>8>0);
+        set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     default:;
         bool workingflag;
@@ -348,10 +347,10 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    set_r8(&reg, R8A, 0x80 + 0x31);
-    set_flag(&reg, HFLAG, 0);
-    *(ram+(reg).PC) = 0b00100111;
-
+    set_flag(&reg, CFLAG, 1);
+    set_r8(&reg, R8A, 0x54);
+    set_r8(&reg, R8H, 0x64);
+    *(ram+(reg).PC) = 0b10111100;
 
     for (int i=0; i<10; i++) {
         run_instruction(&rom, ram, &reg);
