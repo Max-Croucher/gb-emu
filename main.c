@@ -423,6 +423,66 @@ uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         (*reg).SP+=2;
         set_ime(reg, 1);
         break;
+    case 0b11000010:
+    case 0b11001010:
+    case 0b11010010:
+    case 0b11011010: //JP cond, imm16 | conditional jump to imm16
+        if (is_cc(reg, (opcode>>3)&3)) {
+            offset_pc = 0;
+            memcpy(&imm16, ram+(*reg).PC+1, 2);
+            set_r16(reg, R16PC, imm16);
+        } else {
+            offset_pc = 3;
+        }
+        break;
+    case 0b11000011: //JP, imm16 | jump to imm16
+        offset_pc = 0;
+        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        set_r16(reg, R16PC, imm16);
+        break;
+    case 0b11101001: //JP, HL | jump to address in HL
+        offset_pc = 0;
+        set_r16(reg, R16PC, get_r16(reg, R16HL));
+        break;
+    case 0b11000100:
+    case 0b11001100:
+    case 0b11010100:
+    case 0b11011100: //CALL cond, imm16 | conditional call to imm16
+        if (is_cc(reg, (opcode>>3)&3)) {
+            offset_pc = 0;
+            memcpy(&imm16, ram+(*reg).PC+1, 2);
+            (*reg).SP-=2;
+            (*reg).PC+=3;
+            memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+            set_r16(reg, R16PC, get_r16(reg, imm16));
+        } else {
+            offset_pc = 3;
+        }
+        break;
+    case 0b11001101: //CALL, imm16 | call to imm16
+        offset_pc = 0;
+        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        (*reg).SP-=2;
+        (*reg).PC+=3;
+        memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+        set_r16(reg, R16PC, imm16);
+        break;
+    case 0b11000111:
+    case 0b11001111:
+    case 0b11010111:
+    case 0b11011111:
+    case 0b11100111:
+    case 0b11101111:
+    case 0b11110111:
+    case 0b11111111: //RST vec | CALL to address vec*8
+        offset_pc = 0;
+        working16bit = ((opcode>>2)&7)*8;
+        (*reg).SP-=2;
+        (*reg).PC+=1;
+        memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+        set_r16(reg, R16PC, working16bit);
+        break;
+
     default:;
         bool workingflag;
         char buf[64];
@@ -466,12 +526,11 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
-    set_r16(&reg, R16SP, 0xf000);
-    *(ram+(reg).SP) = 0xab;
-    *(ram+(reg).SP+1) = 0xcd;
-    *(ram+(reg).PC) = 0b11011000;
+    *(ram+(reg).PC) = 0b11111111;
 
+    print_registers(&reg);
     for (int i=0; i<10; i++) {
+        printf("\n");
         run_instruction(&rom, ram, &reg);
         print_registers(&reg);
     }
