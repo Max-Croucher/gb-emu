@@ -45,5 +45,6 @@ uint8_t get_r8(Registers *reg, uint8_t regname);
 void set_r8(Registers *reg, uint8_t regname, uint8_t value);
 uint16_t get_r16(Registers *reg, uint16_t regname);
 void set_r16(Registers *reg, uint16_t regname, uint16_t value);
+bool is_cc(Registers *reg, uint8_t cond);
 
 #endif // CPU_H

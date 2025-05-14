@@ -145,3 +145,23 @@ void set_r16(Registers *reg, uint16_t regname, uint16_t value) {
         break;
     }
 }
+
+
+bool is_cc(Registers *reg, uint8_t cond) {
+    /* checks if a condition is met */
+    switch (cond)
+    {
+    case 0b00: // is Z set
+        return get_flag(reg, ZFLAG);
+    case 0b01: // is Z not set
+        return !get_flag(reg, ZFLAG);
+    case 0b10: // is C set
+        return get_flag(reg, CFLAG);
+    case 0b11: // is C not set
+        return !get_flag(reg, CFLAG);
+    
+    default:
+        fprintf(stderr, "Error: Unknown condition code!");
+        exit(EXIT_FAILURE);
+    }
+}
