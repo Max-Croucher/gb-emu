@@ -39,7 +39,7 @@ typedef struct {
 
 Registers init_registers(void);
 void print_registers(Registers *reg);
-uint8_t get_flag(Registers *reg, uint8_t flagname);
+bool get_flag(Registers *reg, uint8_t flagname);
 void set_flag(Registers *reg, uint8_t flagname, bool state);
 uint8_t get_r8(Registers *reg, uint8_t regname);
 void set_r8(Registers *reg, uint8_t regname, uint8_t value);

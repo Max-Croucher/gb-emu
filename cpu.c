@@ -30,7 +30,7 @@ void print_registers(Registers *reg) {
 }
 
 
-uint8_t get_flag(Registers *reg, uint8_t flagname) {
+bool get_flag(Registers *reg, uint8_t flagname) {
     /* get the state associated with the given flag */
     return ((((uint8_t)1<<flagname) & (uint8_t)(*reg).AF))&&1;
 }
