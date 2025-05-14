@@ -17,6 +17,7 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t offset_pc = 0;
     uint16_t working16bit;
     uint8_t working8bit;
+    bool workingflag;
     uint8_t has_finished = 1;
     //explicit 8-bit opcodes
     switch (opcode)
@@ -45,12 +46,82 @@ uint8_t block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
-
-
-
-
-
-
+    /************************************************************************************************/
+    //TEST ME
+    case 0b00010111: //RLA | bit-shift rotate register A left, through C
+        offset_pc = 1;
+        workingflag = get_flag(reg, CFLAG);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)>>7);
+        working8bit = (get_r8(reg, R8A) << 1) + workingflag;
+        set_r8(reg, R8A, working8bit);
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        break;
+    case 0b00011111: //RRA | bit-shift rotate register A right, through C
+        offset_pc = 1;
+        workingflag = get_flag(reg, CFLAG);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)&1);
+        working8bit = (get_r8(reg, R8A) >> 1) + (workingflag<<7);
+        set_r8(reg, R8A, working8bit);
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        break;
+    case 0b00100111: //DAA | Decimal adjust accumulator
+        offset_pc = 1;
+        uint8_t daa_adj = 0;
+        if (get_flag(reg, NFLAG)) {
+            if (get_flag(reg, HFLAG)) daa_adj+= 0x06;
+            if (get_flag(reg, CFLAG)) daa_adj+= 0x60;
+            set_r8(reg, R8A, get_r8(reg, R8A) - daa_adj);
+        } else {
+            if (get_flag(reg, HFLAG) && get_r8(reg, R8A)&0x0F>0x09) daa_adj+= 0x06;
+            if (get_flag(reg, CFLAG) && get_r8(reg, R8A)>0x99) {daa_adj+= 0x60; set_flag(reg, CFLAG, 1);}
+            set_r8(reg, R8A, get_r8(reg, R8A) + daa_adj);
+        }
+        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, get_r8(reg, R8A)>0x99);
+        break;
+    case 0b00101111: //CPL | bitwise not
+        offset_pc = 1;
+        set_flag(reg, R8A, ~get_flag(reg, R8A));
+        set_flag(reg, NFLAG, 1);
+        set_flag(reg, HFLAG, 1);
+        break;
+    case 0b00110111: //SCF | set carry flag
+        offset_pc = 1;
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, 1);
+        break;
+    case 0b00111111: //CCF | complement carry flag
+        offset_pc = 1;
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, HFLAG, 0);
+        set_flag(reg, CFLAG, ~get_flag(reg, CFLAG));
+        break;
+    case 0b00011000: //jr imm8 | relative jump to SIGNED byte in imm8
+        offset_pc = 0;
+        int8_t relative_addr;
+        memcpy(&relative_addr, ram+(*reg).PC+1, 1);
+        set_r16(reg, R16PC, get_r16(reg, R16PC)+relative_addr);
+        break;
+    case 0b00100000:
+    case 0b00101000:
+    case 0b00110000:
+    case 0b00111000: //jr cond; imm8 | relative conditional jump to SIGNED byte in imm8
+        if (is_cc(reg, (opcode>>3)&3)) {
+            offset_pc = block00(rom, ram, reg, 0b00011000); //call jr imm8
+        } else {
+            offset_pc = 2;
+        }
+        break;
+    case 0b00010000: //STOP
+        offset_pc = 2;
+        print_error("STOP is not implemented!");
+        break;
     default:
         has_finished = 0;
     }
@@ -129,6 +200,7 @@ uint8_t block01(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t offset_pc = 0;
     uint16_t working16bit;
     uint8_t working8bit;
+    bool workingflag;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -142,6 +214,7 @@ uint8_t block10(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t offset_pc = 0;
     uint16_t working16bit;
     uint8_t working8bit;
+    bool workingflag;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -155,6 +228,7 @@ uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t offset_pc = 0;
     uint16_t working16bit;
     uint8_t working8bit;
+    bool workingflag;
         char buf[64];
         sprintf(buf, "Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d",
             (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
@@ -196,15 +270,15 @@ int main(int argc, char *argv[]) {
     Registers reg = init_registers();
 
     set_r8(&reg, R8A, 0x05);
-    *(ram+(reg).PC) = 0b00001111;
-    *(ram+(reg).PC+1) = 0b00001111;
-    *(ram+(reg).PC+2) = 0b00001111;
-    *(ram+(reg).PC+3) = 0b00001111;
-    *(ram+(reg).PC+4) = 0b00001111;
-    *(ram+(reg).PC+5) = 0b00001111;
-    *(ram+(reg).PC+6) = 0b00001111;
-    *(ram+(reg).PC+7) = 0b00001111;
-    *(ram+(reg).PC+8) = 0b00001111;
+    *(ram+(reg).PC) = 0b00010111;
+    *(ram+(reg).PC+1) = 0b00010111;
+    *(ram+(reg).PC+2) = 0b00010111;
+    *(ram+(reg).PC+3) = 0b00010111;
+    *(ram+(reg).PC+4) = 0b00010111;
+    *(ram+(reg).PC+5) = 0b00010111;
+    *(ram+(reg).PC+6) = 0b00010111;
+    *(ram+(reg).PC+7) = 0b00010111;
+    *(ram+(reg).PC+8) = 0b00010111;
 
 
     for (int i=0; i<10; i++) {
