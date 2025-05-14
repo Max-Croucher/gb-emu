@@ -13,7 +13,7 @@
 
 Registers init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
-    Registers reg = {0, 0, 0, 0, 0, PROG_START};
+    Registers reg = {0, 0, 0, 0, 0, PROG_START, 0};
     return reg;
 }
 
