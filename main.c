@@ -322,6 +322,7 @@ uint8_t prefixCB(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t has_finished = 1;
     switch (opcode>>3)
     {
+    /***************************************************************************************************************************************/
     case 0b00000: //RLC r8 | bit-shift rotate register r8 left, store wraparound into C
         offset_pc = 1;
         set_flag(reg, CFLAG, get_r8(reg, (opcode&7))>>7);
@@ -626,12 +627,12 @@ uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11100010: // LDH [c], A | load the byte in A to [0xFF00+C] 
         offset_pc = 1;
-        *(ram+0xFF+get_r8(reg, R8C)) = get_r8(reg, R8A);
+        *(ram+0xFF00+get_r8(reg, R8C)) = get_r8(reg, R8A);
         break;
     case 0b11100000: // LDH [imm8], A | load the byte in A to [0xFF00+imm8] 
         offset_pc = 2;
         memcpy(&imm8, ram+(*reg).PC+1, 1);
-        *(ram+0xFF+imm8) = get_r8(reg, R8A);
+        *(ram+0xFF00+imm8) = get_r8(reg, R8A);
         break;
     case 0b11101010: // LD [imm16], A | load the byte in A to [imm16] 
         offset_pc = 3;
@@ -640,17 +641,48 @@ uint8_t block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11110010: // LDH A, [c] | load the byte in [0xFF00+C] to A 
         offset_pc = 1;
-        set_r8(reg, R8A, *(ram+0xFF+get_r8(reg, R8C)));
+        set_r8(reg, R8A, *(ram+0xFF00+get_r8(reg, R8C)));
         break;
     case 0b11110000: // LDH A, [imm8] | load the byte in [0xFF00+imm8] to A 
         offset_pc = 2;
         memcpy(&imm8, ram+(*reg).PC+1, 1);
-        set_r8(reg, R8A, *(ram+0xFF+imm8));
+        set_r8(reg, R8A, *(ram+0xFF00+imm8));
         break;
     case 0b11111010: // LD A, [imm16] | load the byte in [imm16] to A
         offset_pc = 3;
         memcpy(&imm16, ram+(*reg).PC+1, 2);
         set_r8(reg, R8A, *(ram+imm16));
+        break;
+    case 0b11101000: // ADD SP, imm8 | add imm8 to SP
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r16(reg, R16SP, get_r16(reg, R16SP) + imm8);
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<imm8);
+        set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<(imm8&15));
+        break;
+    case 0b11111000: // LD HL, SP + imm8 | add imm8 to SP and copy result to HL
+        offset_pc = 2;
+        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        set_r16(reg, R16SP, get_r16(reg, R16SP) + imm8);
+        set_r16(reg, R16HL, get_r16(reg, R16SP));
+        set_flag(reg, ZFLAG, 0);
+        set_flag(reg, NFLAG, 0);
+        set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<imm8);
+        set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<(imm8&15));
+        break;
+    case 0b11111001: //LD SP, HL | copy HL into SP
+        offset_pc = 1;
+        set_r16(reg, R16SP, get_r16(reg, R16HL));
+        break;
+    case 0b11110011: //DI | disable interrupts
+        offset_pc = 1;
+        set_ime(reg, 0);
+        break;
+    case 0b11111011: //EI | enable interrupts
+        offset_pc = 1;
+        set_ime(reg, 1);
         break;
     default:;
         bool workingflag;
@@ -697,29 +729,28 @@ int main(int argc, char *argv[]) {
     Registers reg = init_registers();
 
 
-    set_r16(&reg, R16BC, 0x1234);
-    set_r16(&reg, R16DE, 0x89ab);
-    set_r16(&reg, R16HL, 0xeffe);
-    *(ram+(reg).PC) = 0b11000101; //push BC
-    *(ram+(reg).PC+1) = 0b11010101; //push DE
-    *(ram+(reg).PC+2) = 0b11100101; //push HL
-    *(ram+(reg).PC+3) = 0b00000001; //Load to BC
-    *(ram+(reg).PC+4) = 0b00000000; //0x0000
-    *(ram+(reg).PC+5) = 0b00000000;
-    *(ram+(reg).PC+6) = 0b00010001; //Load to DE
-    *(ram+(reg).PC+7) = 0b00000000; //0x0000
-    *(ram+(reg).PC+8) = 0b00000000;
-    *(ram+(reg).PC+9) = 0b00100001; //Load to HL
-    *(ram+(reg).PC+10) = 0b00000000; //0x0000
-    *(ram+(reg).PC+11) = 0b00000000;
-    *(ram+(reg).PC+12) = 0b11000001; //Pop BC
-    *(ram+(reg).PC+13) = 0b11010001; //Pop DE
-    *(ram+(reg).PC+14) = 0b11100001; //Pop HL
-    *(ram+(reg).PC+15) = 0b00000000; //NOP
-    
+    // set_r16(&reg, R16BC, 0x1234);
+    // set_r16(&reg, R16DE, 0x89ab);
+    // set_r16(&reg, R16HL, 0xeffe);
+    // *(ram+(reg).PC) = 0b11000101; //push BC
+    // *(ram+(reg).PC+1) = 0b11010101; //push DE
+    // *(ram+(reg).PC+2) = 0b11100101; //push HL
+    // *(ram+(reg).PC+3) = 0b00000001; //Load to BC
+    // *(ram+(reg).PC+4) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+5) = 0b00000000;
+    // *(ram+(reg).PC+6) = 0b00010001; //Load to DE
+    // *(ram+(reg).PC+7) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+8) = 0b00000000;
+    // *(ram+(reg).PC+9) = 0b00100001; //Load to HL
+    // *(ram+(reg).PC+10) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+11) = 0b00000000;
+    // *(ram+(reg).PC+12) = 0b11000001; //Pop BC
+    // *(ram+(reg).PC+13) = 0b11010001; //Pop DE
+    // *(ram+(reg).PC+14) = 0b11100001; //Pop HL
+    // *(ram+(reg).PC+15) = 0b00000000; //NOP
 
     print_registers(&reg);
-    for (int i=0; i<10; i++) {
+    for (int i=0; i<2; i++) {
         printf("\n");
         run_instruction(&rom, ram, &reg);
         print_registers(&reg);
