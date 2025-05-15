@@ -147,13 +147,29 @@ InstructionCost block00(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode
         memcpy(&imm16, ram+(*reg).PC+1, 2);
         set_r16(reg, (opcode>>4)&3, imm16);
         break;
-    case 2: //LD [r16], A | load contents of r8A to the byte pointed to by [r16]
+    case 2: //LD [r16mem], A | load contents of r8A to the byte pointed to by [r16mem], conditionally incrementing HL
         instruction_cost = (InstructionCost){1,2};
-        *(ram+get_r16(reg, (opcode>>4)&3)) = get_r8(reg, R8A);
+        if (((opcode>>4)&3) == 2) {
+            *(ram+get_r16(reg, R16HL)) = get_r8(reg, R8A);
+            set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
+        } else if (((opcode>>4)&3) == 3) {
+            *(ram+get_r16(reg, R16HL)) = get_r8(reg, R8A);
+            set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
+        } else {
+            *(ram+get_r16(reg, (opcode>>4)&3)) = get_r8(reg, R8A);
+        }
         break;
-    case 10: //LD A, [r16] | load byte pointed to by address [r16] into A
+    case 10: //LD A, [r16mem] | load byte pointed to by [r16mem] into A, conditionally incrementing HL
         instruction_cost = (InstructionCost){1,2};
-        set_r8(reg, R8A, *(ram+get_r16(reg, (opcode>>4)&3)));
+        if (((opcode>>4)&3) == 2) {
+            set_r8(reg, R8A, *(ram+get_r16(reg, R16HL)));
+            set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
+        } else if (((opcode>>4)&3) == 3) {
+            set_r8(reg, R8A, *(ram+get_r16(reg, R16HL)));
+            set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
+        } else {
+            set_r8(reg, R8A, *(ram+get_r16(reg, (opcode>>4)&3)));
+        }
         break;
     case 3: //INC r16 | increment r16
         instruction_cost = (InstructionCost){1,2};
