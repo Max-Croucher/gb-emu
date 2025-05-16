@@ -13,7 +13,7 @@
 #include "rom.h"
 #include "opcodes.h"
 
-bool check_interrupts(uint8_t* ram, Registers* reg) {
+bool service_interrupts(uint8_t* ram, Registers* reg) {
     /* Check if an interrupt is due, moving execution if necessary */
     if ((*reg).IME) { // IME must be set
         uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF);
@@ -39,39 +39,39 @@ int main(int argc, char *argv[]) {
     Registers reg = init_registers();
 
     /*Stack test with an ISR*/
-    set_ime(&reg, 1);
-    *(ram+0xFFFF) = 1; //enable VBlank interrupts
-    *(ram+0xFFac) = 0xcf;
-    set_r16(&reg, R16BC, 0x1234);
-    set_r16(&reg, R16DE, 0x89ab);
-    set_r16(&reg, R16HL, 0xeffe);
-    *(ram+(reg).PC) = 0b11000101; //push BC
-    *(ram+(reg).PC+1) = 0b11010101; //push DE
-    *(ram+(reg).PC+2) = 0b11100101; //push HL
-    *(ram+(reg).PC+3) = 0b00000001; //Load to BC
-    *(ram+(reg).PC+4) = 0b00000000; //0x0000
-    *(ram+(reg).PC+5) = 0b00000000;
-    *(ram+(reg).PC+6) = 0b00010001; //Load to DE
-    *(ram+(reg).PC+7) = 0b00000000; //0x0000
-    *(ram+(reg).PC+8) = 0b00000000;
-    *(ram+(reg).PC+9) = 0b00100001; //Load to HL
-    *(ram+(reg).PC+10) = 0b00000000; //0x0000
-    *(ram+(reg).PC+11) = 0b00000000;
-    *(ram+(reg).PC+12) = 0b00000000;
-    *(ram+(reg).PC+13) = 0b00111100; //INC A
-    *(ram+(reg).PC+14) = 0b00000000;
-    *(ram+(reg).PC+15) = 0b11000001; //Pop BC
-    *(ram+(reg).PC+16) = 0b11010001; //Pop DE
-    *(ram+(reg).PC+17) = 0b11100001; //Pop HL
-    *(ram+(reg).PC+18) = 0b11110011; //DI
-    *(ram+(reg).PC+19) = 0b00000000; //NOP
-    *(ram+(reg).PC+20) = 0b11111011; //EI
-    *(ram+(reg).PC+21) = 0b00000000; //NOP
-    *(ram+(reg).PC+22) = 0xFD; //Hard Lock
-    *(ram+0x40) = 0b00110111; //ISR entry, CSF
-    *(ram+0x41) = 0b11110000; //LDH A, imm8
-    *(ram+0x42) = 0xac;
-    *(ram+0x43) = 0b11011001;
+    // set_ime(&reg, 1);
+    // *(ram+0xFFFF) = 1; //enable VBlank interrupts
+    // *(ram+0xFFac) = 0xcf;
+    // set_r16(&reg, R16BC, 0x1234);
+    // set_r16(&reg, R16DE, 0x89ab);
+    // set_r16(&reg, R16HL, 0xeffe);
+    // *(ram+(reg).PC) = 0b11000101; //push BC
+    // *(ram+(reg).PC+1) = 0b11010101; //push DE
+    // *(ram+(reg).PC+2) = 0b11100101; //push HL
+    // *(ram+(reg).PC+3) = 0b00000001; //Load to BC
+    // *(ram+(reg).PC+4) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+5) = 0b00000000;
+    // *(ram+(reg).PC+6) = 0b00010001; //Load to DE
+    // *(ram+(reg).PC+7) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+8) = 0b00000000;
+    // *(ram+(reg).PC+9) = 0b00100001; //Load to HL
+    // *(ram+(reg).PC+10) = 0b00000000; //0x0000
+    // *(ram+(reg).PC+11) = 0b00000000;
+    // *(ram+(reg).PC+12) = 0b00000000;
+    // *(ram+(reg).PC+13) = 0b00111100; //INC A
+    // *(ram+(reg).PC+14) = 0b00000000;
+    // *(ram+(reg).PC+15) = 0b11000001; //Pop BC
+    // *(ram+(reg).PC+16) = 0b11010001; //Pop DE
+    // *(ram+(reg).PC+17) = 0b11100001; //Pop HL
+    // *(ram+(reg).PC+18) = 0b11110011; //DI
+    // *(ram+(reg).PC+19) = 0b00000000; //NOP
+    // *(ram+(reg).PC+20) = 0b11111011; //EI
+    // *(ram+(reg).PC+21) = 0b00000000; //NOP
+    // *(ram+(reg).PC+22) = 0xFD; //Hard Lock
+    // *(ram+0x40) = 0b00110111; //ISR entry, CSF
+    // *(ram+0x41) = 0b11110000; //LDH A, imm8
+    // *(ram+0x42) = 0xac;
+    // *(ram+0x43) = 0b11011001;
 
     print_registers(&reg);
 
@@ -80,8 +80,8 @@ int main(int argc, char *argv[]) {
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
 
     int16_t machine_timeout = 0;
-    for (int i=0; i<500; i++) {
-        printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
+    for (int i=0; i<300; i++) {
+        //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
         /*Interrupt for stack test*/
         // if (reg.PC == 0x0111 && !get_flag(&reg, CFLAG)) { //simulate a vblank
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
         if (halt_state == 2 && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
             halt_state = 0;
         } else if (!machine_timeout) {
-            if (check_interrupts(ram, &reg)) {
+            if (service_interrupts(ram, &reg)) {
                 halt_state = 0; // clear halt state
                 machine_timeout += 5;
             }
