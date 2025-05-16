@@ -191,3 +191,9 @@ uint8_t decode_r16stk(uint8_t code) {
         fprintf(stderr, "Error: Unknown r16stk code!");
     }
 }
+
+void set_isr_enable(uint8_t *ram, uint8_t isr_type, bool state) {
+    /* Enable or disable a particular type of interrupt */
+    *(ram+0xFFFF) &= ~(1<<isr_type); //clear bit
+    *(ram+0xFFFF) |= (state<<isr_type); //set bit
+}

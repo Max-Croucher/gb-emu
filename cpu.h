@@ -39,6 +39,12 @@ typedef struct {
 #define R16PC 4
 #define R16AF 5
 
+#define ISR_VBLANK 0 //define ISR type offsets
+#define ISR_LCD 1
+#define ISR_TIMER 2
+#define ISR_SERIAL 3
+#define ISR_JOYPAD 4
+
 Registers init_registers(void);
 void print_registers(Registers *reg);
 bool get_flag(Registers *reg, uint8_t flagname);
@@ -49,5 +55,6 @@ uint16_t get_r16(Registers *reg, uint16_t regname);
 void set_r16(Registers *reg, uint16_t regname, uint16_t value);
 bool is_cc(Registers *reg, uint8_t cond);
 void set_ime(Registers *reg, bool state);
+void set_isr_enable(uint8_t *ram, uint8_t isr_type, bool state);
 
 #endif // CPU_H

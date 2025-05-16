@@ -735,7 +735,7 @@ InstructionCost block11(gbRom* rom, uint8_t* ram, Registers* reg, uint8_t opcode
 }
 
 
-void run_instruction(gbRom* rom, uint8_t* ram, Registers* reg) {
+uint16_t run_instruction(gbRom* rom, uint8_t* ram, Registers* reg) {
     /* read the opcode at the PC and execute an instruction */
     uint8_t opcode = *(ram+(*reg).PC);
     printf("PC=0x%.4x OPCODE=0x%.2x BITS=",(*reg).PC, opcode);
@@ -760,6 +760,26 @@ void run_instruction(gbRom* rom, uint8_t* ram, Registers* reg) {
         break;
     }
     (*reg).PC+= instruction_cost.pc_offset;
+    return instruction_cost.machine_cycles;
+}
+
+bool check_interrupts(uint8_t* ram, Registers* reg) {
+    /* Check if an interrupt is due, moving execution if necessary */
+    if ((*reg).IME) { // IME must be set
+        uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF);
+        for (int isr=0; isr<5; isr++) { //Check for each of the 5 interrupts
+            if (available_regs & 1<<isr) {
+                set_ime(reg, 0); //disable isr flag
+                set_isr_enable(ram, isr, 0);
+                (*reg).SP-=2; //execute a CALL (push PC to stack)
+                memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+                printf("Got one! %d to be sent to 0x%.4x\n", isr, 0x40+(isr<<3));
+                set_r16(reg, R16PC, 0x40+(isr<<3)); // go to corresponding isr addr
+                return 1;
+            }
+        }
+        return 0;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -767,32 +787,61 @@ int main(int argc, char *argv[]) {
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
 
+    set_ime(&reg, 1);
+    *(ram+0xFFFF) = 1; //enable VBlank interrupts
+    *(ram+0xFFac) = 0xcf;
+    set_r16(&reg, R16BC, 0x1234);
+    set_r16(&reg, R16DE, 0x89ab);
+    set_r16(&reg, R16HL, 0xeffe);
+    *(ram+(reg).PC) = 0b11000101; //push BC
+    *(ram+(reg).PC+1) = 0b11010101; //push DE
+    *(ram+(reg).PC+2) = 0b11100101; //push HL
+    *(ram+(reg).PC+3) = 0b00000001; //Load to BC
+    *(ram+(reg).PC+4) = 0b00000000; //0x0000
+    *(ram+(reg).PC+5) = 0b00000000;
+    *(ram+(reg).PC+6) = 0b00010001; //Load to DE
+    *(ram+(reg).PC+7) = 0b00000000; //0x0000
+    *(ram+(reg).PC+8) = 0b00000000;
+    *(ram+(reg).PC+9) = 0b00100001; //Load to HL
+    *(ram+(reg).PC+10) = 0b00000000; //0x0000
+    *(ram+(reg).PC+11) = 0b00000000;
+    *(ram+(reg).PC+12) = 0b00000000;
+    *(ram+(reg).PC+13) = 0b00111100; //INC A
+    *(ram+(reg).PC+14) = 0b00000000;
+    *(ram+(reg).PC+15) = 0b11000001; //Pop BC
+    *(ram+(reg).PC+16) = 0b11010001; //Pop DE
+    *(ram+(reg).PC+17) = 0b11100001; //Pop HL
+    *(ram+(reg).PC+18) = 0b00000000; //NOP
+    *(ram+(reg).PC+19) = 0xFD; //Hard Lock
 
-    // set_r16(&reg, R16BC, 0x1234);
-    // set_r16(&reg, R16DE, 0x89ab);
-    // set_r16(&reg, R16HL, 0xeffe);
-    // *(ram+(reg).PC) = 0b11000101; //push BC
-    // *(ram+(reg).PC+1) = 0b11010101; //push DE
-    // *(ram+(reg).PC+2) = 0b11100101; //push HL
-    // *(ram+(reg).PC+3) = 0b00000001; //Load to BC
-    // *(ram+(reg).PC+4) = 0b00000000; //0x0000
-    // *(ram+(reg).PC+5) = 0b00000000;
-    // *(ram+(reg).PC+6) = 0b00010001; //Load to DE
-    // *(ram+(reg).PC+7) = 0b00000000; //0x0000
-    // *(ram+(reg).PC+8) = 0b00000000;
-    // *(ram+(reg).PC+9) = 0b00100001; //Load to HL
-    // *(ram+(reg).PC+10) = 0b00000000; //0x0000
-    // *(ram+(reg).PC+11) = 0b00000000;
-    // *(ram+(reg).PC+12) = 0b11000001; //Pop BC
-    // *(ram+(reg).PC+13) = 0b11010001; //Pop DE
-    // *(ram+(reg).PC+14) = 0b11100001; //Pop HL
-    // *(ram+(reg).PC+15) = 0b00000000; //NOP
+    *(ram+0x40) = 0b00110111; //ISR entry, CSF
+    *(ram+0x41) = 0b11110000; //LDH A, imm8
+    *(ram+0x42) = 0xac;
+    *(ram+0x43) = 0b11011001;
 
     print_registers(&reg);
-    for (int i=0; i<2; i++) {
-        printf("\n");
-        run_instruction(&rom, ram, &reg);
-        print_registers(&reg);
+
+
+    int16_t machine_timeout = 0;
+    bool interrupt_triggered = 0;
+    for (int i=0; i<1000; i++) {
+        //printf("%d|%d ", i, machine_timeout);
+        if (reg.PC == 0x0111 && !get_flag(&reg, CFLAG)) { //simulate a vblank
+            *(ram+0xFF0F) = 1; //enable VBlank interrupts
+        }
+
+        if (!machine_timeout && !interrupt_triggered) {
+            interrupt_triggered = check_interrupts(ram, &reg);
+            machine_timeout += 5*interrupt_triggered;
+        }
+        if (!machine_timeout) {
+            uint8_t cycles = run_instruction(&rom, ram, &reg);
+            machine_timeout += cycles*4;
+            print_registers(&reg);
+        }
+        if (machine_timeout) {
+            machine_timeout -= 1;
+        }
     }
 
     return 0;
