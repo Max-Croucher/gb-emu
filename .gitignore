@@ -2,4 +2,6 @@
 !.gitignore
 !*.c
 !*.h
+!*.py
+!nops.gb
 !makefile
