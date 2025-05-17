@@ -17,6 +17,18 @@ typedef struct {
     bool IME;
 } Registers;
 
+
+typedef struct {
+  bool select;
+  bool start;
+  bool B;
+  bool A;
+  bool down;
+  bool up;
+  bool left;
+  bool right;
+} JoypadState;
+
 #define PROG_START 0x0100
 
 #define ZFLAG 7 //define flags
@@ -60,5 +72,6 @@ void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte);
 uint8_t read_byte(uint8_t *ram, uint16_t addr);
 void write_word(uint8_t *ram, uint16_t addr, uint16_t word);
 uint16_t read_word(uint8_t *ram, uint16_t addr);
+void joypad_io(uint8_t* ram) ;
 
 #endif // CPU_H

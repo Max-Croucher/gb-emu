@@ -11,6 +11,9 @@
 #include <stdbool.h>
 #include "cpu.h"
 
+static int joypad_io_state = 0;
+static JoypadState joypad_state = {0,0,0,0,0,0,0,0};
+
 Registers init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
     Registers reg = {0, 0, 0, 0, 0xFFFE, PROG_START, 0};
@@ -210,6 +213,10 @@ void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
     }
     if (addr >= 0xFEA0 && addr < 0xFEFF) return;
 
+    if (addr == 0xFF00) joypad_io(ram); //writing to this addr queries the joypad
+
+    if (addr == 0xFF04) *(ram+addr) = 0; //writing to DIV sets it to 0
+
     *(ram+addr) = byte; // write if no return
 
 }
@@ -231,4 +238,23 @@ void write_word(uint8_t *ram, uint16_t addr, uint16_t word) {
 uint16_t read_word(uint8_t *ram, uint16_t addr) {
     /* Read a word from a particular address and the next. */
     return (((uint16_t)read_byte(ram, addr+1)) << 8) + read_byte(ram, addr);
+}
+
+
+void joypad_io(uint8_t* ram) {
+    switch (joypad_io_state)
+    {
+    case 0:
+    case 3:
+        *(ram+0xFF00) |=0x0F;
+        break;
+    case 1:
+        *(ram+0xFF00) &=0xF0;
+        *(ram+0xFF00) |= (!joypad_state.down<<3) + (!joypad_state.up<<2) + (!joypad_state.left<<1) + (!joypad_state.right);
+        break;
+    case 2:
+        *(ram+0xFF00) &=0xF0;
+        *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
+        break;
+    }
 }
