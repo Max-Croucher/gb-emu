@@ -9,14 +9,11 @@ Notes:
     - implement STOP behavior
     - implement io
     - implement graphics
-    - implement timers
     - implement bank switching & other cartridge features
-    - implement inconsistent TIMA interrupts
-    - implement writing to DIV
+    - implement strange div write behaviour
 
 
 */
-
 
 
 #include <stdio.h>
@@ -27,6 +24,10 @@ Notes:
 #include "cpu.h"
 #include "rom.h"
 #include "opcodes.h"
+
+
+extern bool TIMA_oddity;
+
 
 bool service_interrupts(uint8_t* ram, Registers* reg) {
     /* Check if an interrupt is due, moving execution if necessary */
@@ -48,11 +49,12 @@ bool service_interrupts(uint8_t* ram, Registers* reg) {
 }
 
 
-void increment_timers(uint8_t* ram, uint16_t machine_ticks) {
+bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
     /* Handle the incrementing and overflowing of timers */
     if (!(machine_ticks&0x00FF)) (*(ram+0xFF04))++; //DIV
     uint8_t TAC = *(ram+0xFF07);
     bool trigger = 0;
+    bool do_interrupt = 0;
     if (TAC&4) { // Is timer enabled
         switch (TAC&3) // Select timer speed
         {
@@ -71,10 +73,10 @@ void increment_timers(uint8_t* ram, uint16_t machine_ticks) {
         }
         //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
         if (trigger && !*(ram+0xFF05)) { //TIMA overflows
-            *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
-            *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
+            do_interrupt = 1;
         }
     }
+    return do_interrupt;
 }
 
 
@@ -85,6 +87,7 @@ int main(int argc, char *argv[]) {
     InstructionResult instruction_result = {0,0,0,0};
     
     bool do_ei = 0;
+    bool do_timer_overflow = 0;
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     int16_t machine_timeout = 0;
     uint16_t machine_ticks = 1;
@@ -96,7 +99,16 @@ int main(int argc, char *argv[]) {
         if (!machine_ticks) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
-        increment_timers(ram, machine_ticks);
+        if (do_timer_overflow) { // process overflows one cycle late
+            if (TIMA_oddity) {
+                TIMA_oddity = 0;
+            } else {
+                *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
+                *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
+            }
+            do_timer_overflow = 0;
+        }
+        if (increment_timers(ram, machine_ticks)) do_timer_overflow = 1;
 
         if (!machine_timeout) {
 

@@ -13,6 +13,7 @@
 
 static int joypad_io_state = 0;
 static JoypadState joypad_state = {0,0,0,0,0,0,0,0};
+bool TIMA_oddity = 0;
 
 Registers init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
@@ -216,6 +217,22 @@ void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
     if (addr == 0xFF00) joypad_io(ram); //writing to this addr queries the joypad
 
     if (addr == 0xFF04) *(ram+addr) = 0; //writing to DIV sets it to 0
+
+    //strange TIMA behaviour
+    if (addr == 0xFF05) { //TIMA 
+        if (!*(ram+addr)) {
+            TIMA_oddity = 1;
+            *(ram+addr) = byte;
+            return;
+        }
+        if (*(ram+0xFF05) == *(ram+0xFF06)) return;
+    }
+
+    if (addr == 0xFF06 && (*(ram+0xFF05) == *(ram+0xFF06))) {//writing to TMA on overflow: write to both
+        *(ram+0xFF05) = byte;
+        *(ram+0xFF06) = byte;
+        return;
+    }
 
     *(ram+addr) = byte; // write if no return
 
