@@ -73,5 +73,6 @@ uint8_t read_byte(uint8_t *ram, uint16_t addr);
 void write_word(uint8_t *ram, uint16_t addr, uint16_t word);
 uint16_t read_word(uint8_t *ram, uint16_t addr);
 void joypad_io(uint8_t* ram) ;
+void set_render_blocking_mode(uint8_t mode);
 
 #endif // CPU_H

@@ -5,13 +5,13 @@ all: gbemu
 
 main.o: main.c cpu.h rom.h opcodes.h graphics.h
 	$(CC) -c $(CFLAGS) $< -o $@
-cpu.o: cpu.c cpu.h
+cpu.o: cpu.c cpu.h rom.h
 	$(CC) -c $(CFLAGS) $< -o $@
-opcodes.o: opcodes.c opcodes.h cpu.c
+opcodes.o: opcodes.c opcodes.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@
 rom.o: rom.c rom.h
 	$(CC) -c $(CFLAGS) $< -o $@
-graphics.o: graphics.c graphics.h cpu.c
+graphics.o: graphics.c graphics.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@ -lglut -lGL
 
 gbemu: main.o cpu.o rom.o opcodes.o graphics.o

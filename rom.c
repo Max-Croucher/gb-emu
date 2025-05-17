@@ -10,6 +10,8 @@
 #include <string.h>
 #include "rom.h"
 
+static gbRom rom_container;
+
 void print_error(char errormsg[]) {
     /* print an error message and exit */
     fprintf(stderr, "Error: %s\n", errormsg);
@@ -64,7 +66,6 @@ int decode_ram_size(uint8_t ramcode) {
 
 gbRom init_rom(FILE* romfile) {
     /* read a gameboy rom to process the header and load the rom contents into memory */
-    gbRom rom_container;
     int read_errors = 0;
     fseek(romfile, HEADER_START, SEEK_SET);
     read_errors += 16!=fread(&rom_container.title, 1, 16, romfile);
@@ -139,4 +140,18 @@ uint8_t* init_ram(gbRom *rom) {
     uint8_t *ram = malloc(0x10000);
     memcpy(ram, (*rom).rom, 0x8000);
     return ram;
+}
+
+
+void mbank_register(uint8_t* ram, uint8_t mbc_reg, uint8_t value) {
+    /* Handle writing to an mbank register */
+    if (rom_container.carttype == 1) {
+        if (mbc_reg = 1) {
+            value &= 0x1F;
+            if (value == 0) value += 1;
+            uint8_t num_banks = rom_container.romsize>>15;
+            uint8_t bank_id = value&(num_banks-1);
+            memcpy(ram+0x4000, rom_container.rom+(bank_id*0x4000), 0x4000);
+        }
+    }
 }

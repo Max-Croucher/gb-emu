@@ -10,10 +10,12 @@
 #include <string.h>
 #include <stdbool.h>
 #include "cpu.h"
+#include "rom.h"
 
 static int joypad_io_state = 0;
 static JoypadState joypad_state = {0,0,0,0,0,0,0,0};
 bool TIMA_oddity = 0;
+uint8_t vblank_mode = 0;
 
 Registers init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
@@ -207,7 +209,18 @@ void set_isr_enable(uint8_t *ram, uint8_t isr_type, bool state) {
 
 void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
-    if (addr < 0x8000) return;
+    if (addr < 0x8000) { //mbc registers
+        if (addr < 0x2000) {
+            mbank_register(ram, 0, byte);
+        } else if (addr < 0x4000) {
+            mbank_register(ram, 1, byte);
+        } else if (addr < 0x6000) {
+            mbank_register(ram, 2, byte);
+        }  else {
+            mbank_register(ram, 3, byte);
+        }
+        return;
+    }
     if (addr >= 0xE000 && addr < 0xFE00) {
         write_byte(ram, addr-0x2000, byte); //Echo RAM
         return;
@@ -234,6 +247,11 @@ void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
         return;
     }
 
+
+    if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
+    if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
+
+
     *(ram+addr) = byte; // write if no return
 
 }
@@ -241,6 +259,8 @@ void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint8_t *ram, uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
+    if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
+    if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
     return *(ram+addr);
 }
 
@@ -274,4 +294,9 @@ void joypad_io(uint8_t* ram) {
         *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
         break;
     }
+}
+
+void set_render_blocking_mode(uint8_t mode) {
+    /* Set the current rendering mode, to indicate which vram blocks are inaccessible */
+    vblank_mode = mode;
 }
