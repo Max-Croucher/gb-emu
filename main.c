@@ -21,9 +21,13 @@ Notes:
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <GL/freeglut.h>
 #include "cpu.h"
 #include "rom.h"
 #include "opcodes.h"
+#include "graphics.h"
+
+#include <unistd.h>
 
 
 extern bool TIMA_oddity;
@@ -81,6 +85,7 @@ bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
 
 
 int main(int argc, char *argv[]) {
+    init_graphics(&argc, argv);
     gbRom rom = load_rom(argv[1]);
     uint8_t *ram = init_ram(&rom);
     Registers reg = init_registers();
@@ -92,11 +97,12 @@ int main(int argc, char *argv[]) {
     int16_t machine_timeout = 0;
     uint16_t machine_ticks = 1;
 
-    print_registers(&reg);
-
+    //print_registers(&reg);
+    uint16_t count = 0;
     while (1) {
         machine_ticks++;
-        if (!machine_ticks) break;
+        if (!machine_ticks) count += 1;
+        if (count == 64) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
         if (do_timer_overflow) { // process overflows one cycle late
@@ -139,11 +145,13 @@ int main(int argc, char *argv[]) {
                 do_ei = instruction_result.eiset;
                 machine_timeout += instruction_result.machine_cycles*4;
                 reg.PC+= instruction_result.pc_offset;
-                print_registers(&reg);
+                //print_registers(&reg);
             }
         } else {
             machine_timeout -= 1;
         }
+        tick_graphics(ram);
+        //usleep(10);
     }
 
     return 0;
