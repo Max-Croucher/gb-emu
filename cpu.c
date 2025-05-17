@@ -174,6 +174,7 @@ void set_ime(Registers *reg, bool state) {
     (*reg).IME = state;
 }
 
+
 uint8_t decode_r16stk(uint8_t code) {
     /* decode the r16stk code into a usable register */
     switch (code)
@@ -192,8 +193,42 @@ uint8_t decode_r16stk(uint8_t code) {
     }
 }
 
+
 void set_isr_enable(uint8_t *ram, uint8_t isr_type, bool state) {
     /* Enable or disable a particular type of interrupt */
     *(ram+0xFFFF) &= ~(1<<isr_type); //clear bit
     *(ram+0xFFFF) |= (state<<isr_type); //set bit
+}
+
+
+void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte) {
+    /* Write a byte to a particular address. Ignores writing to protected RAM */
+    if (addr < 0x8000) return;
+    if (addr >= 0xE000 && addr < 0xFE00) {
+        write_byte(ram, addr-0x2000, byte); //Echo RAM
+        return;
+    }
+    if (addr >= 0xFEA0 && addr < 0xFEFF) return;
+
+    *(ram+addr) = byte; // write if no return
+
+}
+
+
+uint8_t read_byte(uint8_t *ram, uint16_t addr) {
+    /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
+    return *(ram+addr);
+}
+
+
+void write_word(uint8_t *ram, uint16_t addr, uint16_t word) {
+    /* Write two bytes to a particular address and the next. Ignores writing to protected RAM */
+    write_byte(ram, addr+1, word >> 8);
+    write_byte(ram, addr, word&0xFF);
+}
+
+
+uint16_t read_word(uint8_t *ram, uint16_t addr) {
+    /* Read a word from a particular address and the next. */
+    return (((uint16_t)read_byte(ram, addr+1)) << 8) + read_byte(ram, addr);
 }

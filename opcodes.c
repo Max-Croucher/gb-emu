@@ -27,8 +27,8 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0b00001000: //LD [imm16], SP | load bytes in SP to the bytes pointed to by address [r16] and [r16+1]
         instruction_result = (InstructionResult){0,0,3,3};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
-        memcpy(ram+imm16, &(*reg).SP, 2);
+        imm16 = read_word(ram, (*reg).PC+1);
+        write_word(ram, imm16, (*reg).SP);
         break;
     case 0b00000111: //RLCA | bit-shift rotate register A left, store wraparound into C
         instruction_result = (InstructionResult){0,0,1,1};
@@ -105,7 +105,7 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b00011000: //jr imm8 | relative jump to SIGNED byte in imm8
         instruction_result = (InstructionResult){0,0,2,3};
         int8_t relative_addr;
-        memcpy(&relative_addr, ram+(*reg).PC+1, 1);
+        relative_addr = read_byte(ram, (*reg).PC+1);
         set_r16(reg, R16PC, get_r16(reg, R16PC)+relative_addr);
         break;
     case 0b00100000:
@@ -115,7 +115,7 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
         if (is_cc(reg, (opcode>>3)&3)) {
             instruction_result = (InstructionResult){0,0,2,3};
             int8_t relative_addr;
-            memcpy(&relative_addr, ram+(*reg).PC+1, 1);
+            relative_addr = read_byte(ram, (*reg).PC+1);
             set_r16(reg, R16PC, get_r16(reg, R16PC)+relative_addr);
         } else {
             instruction_result = (InstructionResult){0,0,2,2};
@@ -138,31 +138,31 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 1: //LD r16, imm16 | load 16 bit value imm16 into r16
         instruction_result = (InstructionResult){0,0,3,3};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        imm16 = read_word(ram, (*reg).PC+1);
         set_r16(reg, (opcode>>4)&3, imm16);
         break;
     case 2: //LD [r16mem], A | load contents of r8A to the byte pointed to by [r16mem], conditionally incrementing HL
         instruction_result = (InstructionResult){0,0,1,2};
         if (((opcode>>4)&3) == 2) {
-            *(ram+get_r16(reg, R16HL)) = get_r8(reg, R8A);
+            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, R8A));
             set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
         } else if (((opcode>>4)&3) == 3) {
-            *(ram+get_r16(reg, R16HL)) = get_r8(reg, R8A);
+            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, R8A));
             set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
         } else {
-            *(ram+get_r16(reg, (opcode>>4)&3)) = get_r8(reg, R8A);
+            write_byte(ram, get_r16(reg, (opcode>>4)&3), get_r8(reg, R8A));
         }
         break;
     case 10: //LD A, [r16mem] | load byte pointed to by [r16mem] into A, conditionally incrementing HL
         instruction_result = (InstructionResult){0,0,1,2};
         if (((opcode>>4)&3) == 2) {
-            set_r8(reg, R8A, *(ram+get_r16(reg, R16HL)));
+            set_r8(reg, R8A, read_byte(ram, get_r16(reg, R16HL)));
             set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
         } else if (((opcode>>4)&3) == 3) {
-            set_r8(reg, R8A, *(ram+get_r16(reg, R16HL)));
+            set_r8(reg, R8A, read_byte(ram, get_r16(reg, R16HL)));
             set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
         } else {
-            set_r8(reg, R8A, *(ram+get_r16(reg, (opcode>>4)&3)));
+            set_r8(reg, R8A, read_byte(ram, get_r16(reg, (opcode>>4)&3)));
         }
         break;
     case 3: //INC r16 | increment r16
@@ -200,7 +200,7 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 6:
     case 14: //LD r8, imm8 | load value imm8 into r8
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         set_r8(reg, (opcode>>3)&7, imm8);
         break;
         
@@ -432,7 +432,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0b11000110: //ADD A, imm8 | add contents of imm8 to A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         set_r8(reg, R8A, get_r8(reg, R8A) + imm8);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
@@ -441,7 +441,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11001110: //ADC A, imm8 | add carry and contents of imm8 to A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r8(reg, R8A) + imm8 + get_flag(reg, CFLAG);
         working8bit = get_r8(reg, R8A)&15 + (imm8&15) + get_flag(reg, CFLAG);
         set_r8(reg, R8A, (uint8_t)working16bit);
@@ -452,7 +452,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11010110: //SUB A, imm8 | subtract contents of imm8 from A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r8(reg, R8A) - imm8;
         working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
         set_r8(reg, R8A, (uint8_t)working16bit);
@@ -463,7 +463,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11011110: //SBC A, imm8 | subtract carry and contents of imm8 to A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r8(reg, R8A) - imm8 - get_flag(reg, CFLAG);
         working8bit = (get_r8(reg, R8A)&15) - (imm8&15) - get_flag(reg, CFLAG);
         set_r8(reg, R8A, (uint8_t)working16bit);
@@ -474,7 +474,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11100110: //AND A, imm8 | logical and between imm8 and A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         set_r8(reg, R8A, get_r8(reg, R8A) & imm8);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
@@ -483,7 +483,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11101110: //XOR A, imm8 | logical xor between imm8 and A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         set_r8(reg, R8A, get_r8(reg, R8A) ^ imm8);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
@@ -492,7 +492,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11110110: //OR A, imm8 | logical or between imm8 and A
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         set_r8(reg, R8A, get_r8(reg, R8A) | imm8);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
         set_flag(reg, NFLAG, 0);
@@ -501,7 +501,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11111110: //CP A, imm8 | subtract contents of imm8 from A but discard result
         instruction_result = (InstructionResult){0,0,2,2};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r8(reg, R8A) - imm8;
         working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
         set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
@@ -515,7 +515,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011000: //RET cond | conditional return
         if (is_cc(reg, (opcode>>3)&3)) {
             instruction_result = (InstructionResult){0,0,0,5};
-            memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+            (*reg).PC = read_word(ram, (*reg).SP);
             (*reg).SP+=2;
         } else {
             instruction_result = (InstructionResult){0,0,1,2};
@@ -523,12 +523,12 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11001001: //RET | return
         instruction_result = (InstructionResult){0,0,0,4};
-        memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+        (*reg).PC = read_word(ram, (*reg).SP);
         (*reg).SP+=2;
         break;
     case 0b11011001: //RETI | return and enable IME
         instruction_result = (InstructionResult){0,0,0,4};
-        memcpy(&((*reg).PC), ram+(*reg).SP, 2);
+        (*reg).PC = read_word(ram, (*reg).SP);
         (*reg).SP+=2;
         set_ime(reg, 1);
         break;
@@ -538,7 +538,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011010: //JP cond, imm16 | conditional jump to imm16
         if (is_cc(reg, (opcode>>3)&3)) {
             instruction_result = (InstructionResult){0,0,0,4};
-            memcpy(&imm16, ram+(*reg).PC+1, 2);
+            imm16 = read_word(ram, (*reg).PC+1);
             set_r16(reg, R16PC, imm16);
         } else {
             instruction_result = (InstructionResult){0,0,3,3};
@@ -546,7 +546,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11000011: //JP, imm16 | jump to imm16
         instruction_result = (InstructionResult){0,0,0,3};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        imm16 = read_word(ram, (*reg).PC+1);
         set_r16(reg, R16PC, imm16);
         break;
     case 0b11101001: //JP, HL | jump to address in HL
@@ -559,10 +559,10 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011100: //CALL cond, imm16 | conditional call to imm16
         if (is_cc(reg, (opcode>>3)&3)) {
             instruction_result = (InstructionResult){0,0,0,6};
-            memcpy(&imm16, ram+(*reg).PC+1, 2);
+            imm16 = read_word(ram, (*reg).PC+1);
             (*reg).SP-=2;
             (*reg).PC+=3;
-            memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+            write_word(ram, (*reg).SP, (*reg).PC);
             set_r16(reg, R16PC, get_r16(reg, imm16));
         } else {
             instruction_result = (InstructionResult){0,0,3,3};
@@ -570,10 +570,10 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11001101: //CALL, imm16 | call to imm16
         instruction_result = (InstructionResult){0,0,0,6};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
+        imm16 = read_word(ram, (*reg).PC+1);
         (*reg).SP-=2;
         (*reg).PC+=3;
-        memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+        write_word(ram, (*reg).SP, (*reg).PC);
         set_r16(reg, R16PC, imm16);
         break;
     case 0b11000111:
@@ -588,7 +588,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         working16bit = ((opcode>>2)&7)*8;
         (*reg).SP-=2;
         (*reg).PC+=1;
-        memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+        write_word(ram, (*reg).SP, (*reg).PC);
         set_r16(reg, R16PC, working16bit);
         break;
     case 0b11000001:
@@ -596,7 +596,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11100001:
     case 0b11110001: //POP r16stk | pop register from stack into r16stk
         instruction_result = (InstructionResult){0,0,1,3};
-        memcpy(&working16bit, ram+(*reg).SP, 2);
+        working16bit = read_word(ram, (*reg).SP);
         (*reg).SP+=2;
         switch ((opcode>>4)&3)
         {
@@ -635,7 +635,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
             break;
         }
         (*reg).SP-=2;
-        memcpy(ram+(*reg).SP, &working16bit, 2);
+        write_word(ram, (*reg).SP, working16bit);
         break;
     case 0b11001011: // All prefixed 0xCB opcodes
         instruction_result = prefixCB(ram, reg, *(&((*reg).PC)+1));
@@ -643,35 +643,35 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     case 0b11100010: // LDH [c], A | load the byte in A to [0xFF00+C] 
         instruction_result = (InstructionResult){0,0,1,2};
-        *(ram+0xFF00+get_r8(reg, R8C)) = get_r8(reg, R8A);
+        write_byte(ram, 0xFF00+get_r8(reg, R8C), get_r8(reg, R8A));
         break;
     case 0b11100000: // LDH [imm8], A | load the byte in A to [0xFF00+imm8] 
         instruction_result = (InstructionResult){0,0,2,3};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
-        *(ram+0xFF00+imm8) = get_r8(reg, R8A);
+        imm8 = read_byte(ram, (*reg).PC+1);
+        write_byte(ram, 0xFF00+imm8, get_r8(reg, R8A));
         break;
     case 0b11101010: // LD [imm16], A | load the byte in A to [imm16] 
         instruction_result = (InstructionResult){0,0,3,4};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
-        *(ram+imm16) = get_r8(reg, R8A);
+        imm16 = read_word(ram, (*reg).PC+1);
+        write_byte(ram, imm16, get_r8(reg, R8A));
         break;
     case 0b11110010: // LDH A, [c] | load the byte in [0xFF00+C] to A 
         instruction_result = (InstructionResult){0,0,1,2};
-        set_r8(reg, R8A, *(ram+0xFF00+get_r8(reg, R8C)));
+        set_r8(reg, R8A, read_byte(ram, 0xFF00+get_r8(reg, R8C)));
         break;
     case 0b11110000: // LDH A, [imm8] | load the byte in [0xFF00+imm8] to A 
         instruction_result = (InstructionResult){0,0,2,3};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
-        set_r8(reg, R8A, *(ram+0xFF00+imm8));
+        imm8 = read_byte(ram, (*reg).PC+1);
+        set_r8(reg, R8A, read_byte(ram, 0xFF00+imm8));
         break;
     case 0b11111010: // LD A, [imm16] | load the byte in [imm16] to A
         instruction_result = (InstructionResult){0,0,3,4};
-        memcpy(&imm16, ram+(*reg).PC+1, 2);
-        set_r8(reg, R8A, *(ram+imm16));
+        imm16 = read_word(ram, (*reg).PC+1);
+        set_r8(reg, R8A, read_byte(ram, imm16));
         break;
     case 0b11101000: // ADD SP, imm8 | add imm8 to SP
         instruction_result = (InstructionResult){0,0,2,4};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r16(reg, R16SP);
         set_r16(reg, R16SP, working16bit + (int8_t)imm8);
         set_flag(reg, ZFLAG, 0);
@@ -687,7 +687,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break; 
     case 0b11111000: // LD HL, SP + imm8 | add imm8 to SP and copy result to HL
         instruction_result = (InstructionResult){0,0,2,3};
-        memcpy(&imm8, ram+(*reg).PC+1, 1);
+        imm8 = read_byte(ram, (*reg).PC+1);
         working16bit = get_r16(reg, R16SP);
         set_r16(reg, R16SP, working16bit + (int8_t)imm8);
         set_r16(reg, R16HL, get_r16(reg, R16SP));
@@ -725,7 +725,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
 
 InstructionResult run_instruction(uint8_t* ram, Registers* reg) {
     /* read the opcode at the PC and execute an instruction */
-    uint8_t opcode = *(ram+(*reg).PC);
+    uint8_t opcode = read_byte(ram, (*reg).PC);
     printf("PC=0x%.4x OPCODE=0x%.2x BITS=",(*reg).PC, opcode);
     for (int8_t i=7; i>=0; i--) {
         printf("%d", (opcode>>i) & 1);

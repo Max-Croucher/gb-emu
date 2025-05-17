@@ -38,7 +38,7 @@ bool service_interrupts(uint8_t* ram, Registers* reg) {
                 set_ime(reg, 0); //disable isr flag
                 set_isr_enable(ram, isr, 0);
                 (*reg).SP-=2; //execute a CALL (push PC to stack)
-                memcpy(ram+(*reg).SP, &((*reg).PC), 2);
+                write_word(ram, (*reg).SP, (*reg).PC);
                 set_r16(reg, R16PC, 0x40+(isr<<3)); // go to corresponding isr addr
                 return 1;
             }
@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
                 if (service_interrupts(ram, &reg)) {
                     halt_state = 0; // clear halt state
                     machine_timeout += 20;
+                    printf("ISR\n");
                 }
             }
             if (halt_state == 0 || halt_state == 3) {
