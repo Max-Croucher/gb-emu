@@ -819,8 +819,8 @@ InstructionResult run_instruction(uint8_t* ram, Registers* reg) {
         instruction_result = block11(ram, reg, opcode);
         break;
     }
-    // printf(" OPCODE:%s", last_opcode);
-    // printf("\n");
-    // sprintf(last_opcode, "--");
+    printf(" OPCODE:%s", last_opcode);
+    printf("\n");
+    sprintf(last_opcode, "--");
     return instruction_result;
 }

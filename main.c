@@ -31,7 +31,7 @@ Notes:
 
 
 extern bool TIMA_oddity;
-
+bool tset = 0;
 
 bool service_interrupts(uint8_t* ram, Registers* reg) {
     /* Check if an interrupt is due, moving execution if necessary */
@@ -77,6 +77,7 @@ bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
         }
         //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
         if (trigger && !*(ram+0xFF05)) { //TIMA overflows
+            tset = 1;
             do_interrupt = 1;
         }
     }
@@ -101,7 +102,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         machine_ticks++;
         if (!machine_ticks) count += 1;
-        if (count == 1024) break;
+        if (count == 256) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
         if (increment_timers(ram, machine_ticks)) {
@@ -113,14 +114,17 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (!machine_timeout) {
-                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x\n",
+            if (!machine_timeout) {
+                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d TIME:%d HALTMODE:%d INTFLAGS:%.2x",
                 get_r8(&reg, ram, R8A),get_r8(&reg, ram, R8F),get_r8(&reg, ram, R8B),get_r8(&reg, ram, R8C),
                 get_r8(&reg, ram, R8D),get_r8(&reg, ram, R8E),get_r8(&reg, ram, R8H),get_r8(&reg, ram, R8L),
                 get_r16(&reg, R16SP),get_r16(&reg, R16PC),
-                *(ram+get_r16(&reg, R16PC)),*(ram+get_r16(&reg, R16PC)+1),*(ram+get_r16(&reg, R16PC)+2),*(ram+get_r16(&reg, R16PC)+3)
-                );
-            if (halt_state == 2 && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
+                *(ram+get_r16(&reg, R16PC)),*(ram+get_r16(&reg, R16PC)+1),*(ram+get_r16(&reg, R16PC)+2),*(ram+get_r16(&reg, R16PC)+3),
+                reg.IME, tset, halt_state, *(ram+0xFF0F)
+            );
+            tset = 0;
+
+            if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
                 halt_state = 0;
             } else {
                 if (service_interrupts(ram, &reg)) {
@@ -132,16 +136,17 @@ int main(int argc, char *argv[]) {
             if (halt_state == 0 || halt_state == 3) {
                 instruction_result = run_instruction(ram, &reg);
 
-                if (halt_state == 3) {instruction_result.new_pc = get_r16(&reg, R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
+                //if (halt_state == 2) {instruction_result.new_pc = get_r16(&reg, R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
+                if (halt_state == 3) halt_state = 0;
                 if (do_ei) set_ime(&reg, 1); // set EI late
 
                 if (instruction_result.halt) { // HALT was called:
                     if (reg.IME) {
                         halt_state = 1; // Halt until interrupt is executed
-                    } else if (*(ram+0xFF0F)&*(ram+0xFFFF)) {
-                        halt_state = 3; // Halt until interrupt is requested
+                    } else if (*(ram+0xFF0F)&0x1F) {
+                        halt_state = 3; // Resume, but do instruction twice
                     } else {
-                        halt_state = 2; // Resume, but do instruction twice
+                        halt_state = 2; // Halt until interrupt is requested
                     }
                 }
                 do_ei = instruction_result.eiset;
