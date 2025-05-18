@@ -19,7 +19,7 @@ uint8_t vblank_mode = 0;
 
 Registers init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
-    Registers reg = {0, 0, 0, 0, 0xFFFE, PROG_START, 0};
+    Registers reg = {0x01B0, 0x0013, 0x00D8, 0x014D, 0xFFFE, PROG_START, 0};
     return reg;
 }
 
@@ -55,6 +55,8 @@ uint8_t get_r8(Registers *reg, uint8_t regname) {
     {
     case R8A:
         return (*reg).AF >> 8;
+    case R8F:
+        return (*reg).AF & 0xFF;
     case R8B:
         return (*reg).BC >> 8;
     case R8C:

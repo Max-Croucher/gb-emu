@@ -43,6 +43,7 @@ typedef struct {
 #define R8H 4
 #define R8L 5
 #define R8A 7 
+#define R8F 8 // shouldn't usually be used
 
 #define R16BC 0 //define 16-bit registers
 #define R16DE 1

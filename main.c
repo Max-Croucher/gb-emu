@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         machine_ticks++;
         if (!machine_ticks) count += 1;
-        if (count == 64) break;
+        if (count == 8) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
         if (do_timer_overflow) { // process overflows one cycle late

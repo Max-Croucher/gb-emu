@@ -21,16 +21,16 @@ void print_error(char errormsg[]) {
 
 void print_header(gbRom rom_container) {
     /* print the contents of a gameboy header */
-    printf("Header contents:\n");
-    printf("Title:          %s\n", rom_container.title);
-    printf("Licensee (new): %d\n", rom_container.new_licensee);
-    printf("Super Gameboy:  %d\n", rom_container.sgbflag);
-    printf("Cartrige Type:  %d\n", rom_container.carttype);
-    printf("ROM Size Code:  %d\n", rom_container.romsize);
-    printf("RAM Size Code:  %d\n", rom_container.ramsize);
-    printf("Global Release: %d\n", rom_container.locale);
-    printf("Licensee (old): %d\n", rom_container.old_licensee);
-    printf("Version:        %d\n", rom_container.version);
+    fprintf(stderr,"Header contents:\n");
+    fprintf(stderr,"Title:          %s\n", rom_container.title);
+    fprintf(stderr,"Licensee (new): %d\n", rom_container.new_licensee);
+    fprintf(stderr,"Super Gameboy:  %d\n", rom_container.sgbflag);
+    fprintf(stderr,"Cartrige Type:  %d\n", rom_container.carttype);
+    fprintf(stderr,"ROM Size Code:  %d\n", rom_container.romsize);
+    fprintf(stderr,"RAM Size Code:  %d\n", rom_container.ramsize);
+    fprintf(stderr,"Global Release: %d\n", rom_container.locale);
+    fprintf(stderr,"Licensee (old): %d\n", rom_container.old_licensee);
+    fprintf(stderr,"Version:        %d\n", rom_container.version);
 }
 
 
@@ -114,7 +114,7 @@ gbRom init_rom(FILE* romfile) {
 
 gbRom load_rom(char filename[]) {
 	/* Read a rom file and load contents */
-    printf("Attempting to load rom file %s\n", filename);
+    fprintf(stderr,"Attempting to load rom file %s\n", filename);
 	FILE *romfile;
 	romfile = fopen(filename, "rb");
 	if (romfile == NULL) {
@@ -128,7 +128,7 @@ gbRom load_rom(char filename[]) {
     int bytes_read = fread(rom_container.rom, 1, rom_container.romsize, romfile);
     if (bytes_read != rom_container.romsize) print_error("Unable to load rom file.");
 
-    printf("Successfully loaded rom file.\n");
+    fprintf(stderr,"Successfully loaded rom file.\n");
 
 	fclose(romfile);
     return rom_container;
@@ -139,6 +139,10 @@ uint8_t* init_ram(gbRom *rom) {
     /* Initialise the gameboy RAM, loading the first 32K of rom at 0x0000 */
     uint8_t *ram = malloc(0x10000);
     memcpy(ram, (*rom).rom, 0x8000);
+
+    //various ram addrs
+    *(ram+0xFF44) = 0x90;
+
     return ram;
 }
 
