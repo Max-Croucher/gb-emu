@@ -92,10 +92,9 @@ int main(int argc, char *argv[]) {
     InstructionResult instruction_result = {0,0,0,0};
     
     bool do_ei = 0;
-    bool do_timer_overflow = 0;
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     int16_t machine_timeout = 0;
-    uint16_t machine_ticks = 1;
+    uint16_t machine_ticks = 0;
 
     //print_registers(&reg);
     uint16_t count = 0;
@@ -105,26 +104,29 @@ int main(int argc, char *argv[]) {
         if (count == 1024) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
-        if (do_timer_overflow) { // process overflows one cycle late
+        if (increment_timers(ram, machine_ticks)) {
             if (TIMA_oddity) {
                 TIMA_oddity = 0;
             } else {
                 *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
                 *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
             }
-            do_timer_overflow = 0;
         }
-        if (increment_timers(ram, machine_ticks)) do_timer_overflow = 1;
 
         if (!machine_timeout) {
-
+                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x\n",
+                get_r8(&reg, ram, R8A),get_r8(&reg, ram, R8F),get_r8(&reg, ram, R8B),get_r8(&reg, ram, R8C),
+                get_r8(&reg, ram, R8D),get_r8(&reg, ram, R8E),get_r8(&reg, ram, R8H),get_r8(&reg, ram, R8L),
+                get_r16(&reg, R16SP),get_r16(&reg, R16PC),
+                *(ram+get_r16(&reg, R16PC)),*(ram+get_r16(&reg, R16PC)+1),*(ram+get_r16(&reg, R16PC)+2),*(ram+get_r16(&reg, R16PC)+3)
+                );
             if (halt_state == 2 && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
                 halt_state = 0;
             } else {
                 if (service_interrupts(ram, &reg)) {
                     halt_state = 0; // clear halt state
                     machine_timeout += 20;
-                    printf("ISR\n");
+                    //printf("ISR\n");
                 }
             }
             if (halt_state == 0 || halt_state == 3) {
