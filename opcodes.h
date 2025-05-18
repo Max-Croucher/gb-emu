@@ -11,7 +11,7 @@ typedef struct
 {
     bool halt;
     bool eiset;
-    uint8_t pc_offset;
+    uint16_t new_pc;
     uint8_t machine_cycles;
 } InstructionResult;
 

@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         machine_ticks++;
         if (!machine_ticks) count += 1;
-        if (count == 8) break;
+        if (count == 1024) break;
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
         if (do_timer_overflow) { // process overflows one cycle late
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
             if (halt_state == 0 || halt_state == 3) {
                 instruction_result = run_instruction(ram, &reg);
 
-                if (halt_state == 3) {instruction_result.pc_offset = 0; halt_state = 0;} // instruction after HALT: Don't increment PC
+                if (halt_state == 3) {instruction_result.new_pc = get_r16(&reg, R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
                 if (do_ei) set_ime(&reg, 1); // set EI late
 
                 if (instruction_result.halt) { // HALT was called:
@@ -144,13 +144,13 @@ int main(int argc, char *argv[]) {
                 }
                 do_ei = instruction_result.eiset;
                 machine_timeout += instruction_result.machine_cycles*4;
-                reg.PC+= instruction_result.pc_offset;
+                reg.PC = instruction_result.new_pc;
                 //print_registers(&reg);
             }
         } else {
             machine_timeout -= 1;
         }
-        tick_graphics(ram);
+        //tick_graphics(ram);
         //usleep(10);
     }
 

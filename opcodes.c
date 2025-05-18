@@ -28,96 +28,95 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0b00001000: //LD [imm16], SP | load bytes in SP to the bytes pointed to by address [r16] and [r16+1]
         sprintf(last_opcode, "LD [imm16], SP");
-        instruction_result = (InstructionResult){0,0,3,3};
-        imm16 = read_word(ram, (*reg).PC+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,3};
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
         write_word(ram, imm16, (*reg).SP);
         break;
     case 0b00000111: //RLCA | bit-shift rotate register A left, store wraparound into C
         sprintf(last_opcode, "RLCA");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_flag(reg, CFLAG, get_r8(reg, R8A)>>7);
-        working8bit = (get_r8(reg, R8A) << 1) + get_flag(reg, CFLAG);
-        set_r8(reg, R8A, working8bit);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)>>7);
+        working8bit = (get_r8(reg, ram, R8A) << 1) + get_flag(reg, CFLAG);
+        set_r8(reg, ram, R8A, working8bit);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
     case 0b00001111: //RRCA | bit-shift rotate register A right, store wraparound into C
         sprintf(last_opcode, "RRCA");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_flag(reg, CFLAG, get_r8(reg, R8A)&1);
-        working8bit = (get_r8(reg, R8A) >> 1) + (get_flag(reg, CFLAG)<<7);
-        set_r8(reg, R8A, working8bit);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)&1);
+        working8bit = (get_r8(reg, ram, R8A) >> 1) + (get_flag(reg, CFLAG)<<7);
+        set_r8(reg, ram, R8A, working8bit);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
     case 0b00010111: //RLA | bit-shift rotate register A left, through C
         sprintf(last_opcode, "RLA");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         workingflag = get_flag(reg, CFLAG);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)>>7);
-        working8bit = (get_r8(reg, R8A) << 1) + workingflag;
-        set_r8(reg, R8A, working8bit);
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)>>7);
+        working8bit = (get_r8(reg, ram, R8A) << 1) + workingflag;
+        set_r8(reg, ram, R8A, working8bit);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
     case 0b00011111: //RRA | bit-shift rotate register A right, through C
         sprintf(last_opcode, "RRA");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         workingflag = get_flag(reg, CFLAG);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)&1);
-        working8bit = (get_r8(reg, R8A) >> 1) + (workingflag<<7);
-        set_r8(reg, R8A, working8bit);
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)&1);
+        working8bit = (get_r8(reg, ram, R8A) >> 1) + (workingflag<<7);
+        set_r8(reg, ram, R8A, working8bit);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, NFLAG, 0);
         break;
     case 0b00100111: //DAA | Decimal adjust accumulator
         sprintf(last_opcode, "DAA");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         uint8_t daa_adj = 0;
         if (get_flag(reg, NFLAG)) {
             if (get_flag(reg, HFLAG)) daa_adj+= 0x06;
             if (get_flag(reg, CFLAG)) daa_adj+= 0x60;
-            set_r8(reg, R8A, get_r8(reg, R8A) - daa_adj);
+            set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) - daa_adj);
         } else {
-            if (get_flag(reg, HFLAG) || (get_r8(reg, R8A)&0x0F)>0x09) daa_adj+= 0x06;
-            if (get_flag(reg, CFLAG) || get_r8(reg, R8A)>0x99) {daa_adj+= 0x60; set_flag(reg, CFLAG, 1);}
-            set_r8(reg, R8A, get_r8(reg, R8A) + daa_adj);
+            if (get_flag(reg, HFLAG) || (get_r8(reg, ram, R8A)&0x0F)>0x09) daa_adj+= 0x06;
+            if (get_flag(reg, CFLAG) || get_r8(reg, ram, R8A)>0x99) {daa_adj+= 0x60; set_flag(reg, CFLAG, 1);}
+            set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) + daa_adj);
         }
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, HFLAG, 0);
-        set_flag(reg, CFLAG, get_flag(reg, CFLAG) || get_r8(reg, R8A)>0x99);
+        set_flag(reg, CFLAG, get_flag(reg, CFLAG) || get_r8(reg, ram, R8A)>0x99);
         break;
     case 0b00101111: //CPL | bitwise not
         sprintf(last_opcode, "CPL");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, R8A, ~get_r8(reg, R8A));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, R8A, ~get_r8(reg, ram, R8A));
         set_flag(reg, NFLAG, 1);
         set_flag(reg, HFLAG, 1);
         break;
     case 0b00110111: //SCF | set carry flag
         sprintf(last_opcode, "SCF");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, 1);
         break;
     case 0b00111111: //CCF | complement carry flag
         sprintf(last_opcode, "CCF");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, !get_flag(reg, CFLAG));
         break;
     case 0b00011000: //jr imm8 | relative jump to SIGNED byte in imm8
         sprintf(last_opcode, "JR imm8");
-        instruction_result = (InstructionResult){0,0,2,3};
         int8_t relative_addr;
-        relative_addr = read_byte(ram, (*reg).PC+1);
-        set_r16(reg, R16PC, get_r16(reg, R16PC)+relative_addr);
+        relative_addr = read_byte(ram, get_r16(reg, R16PC)+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+relative_addr+2,3};
         break;
     case 0b00100000:
     case 0b00101000:
@@ -125,17 +124,16 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b00111000: //jr cond; imm8 | relative conditional jump to SIGNED byte in imm8
         sprintf(last_opcode, "JR cond, imm8");
         if (is_cc(reg, (opcode>>3)&3)) {
-            instruction_result = (InstructionResult){0,0,2,3};
             int8_t relative_addr;
-            relative_addr = read_byte(ram, (*reg).PC+1);
-            set_r16(reg, R16PC, get_r16(reg, R16PC)+relative_addr);
+            relative_addr = read_byte(ram, get_r16(reg, R16PC)+1);
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+relative_addr+2,3};
         } else {
-            instruction_result = (InstructionResult){0,0,2,2};
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
         }
         break;
     case 0b00010000: //STOP
         sprintf(last_opcode, "STOP");
-        instruction_result = (InstructionResult){0,0,2,0};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,0};
         fprintf(stderr, "Error: STOP is not implemented!\n");
         exit(EXIT_FAILURE);
         break;
@@ -148,88 +146,89 @@ InstructionResult block00(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0: //NOP
         sprintf(last_opcode, "NOP");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         break;
     case 1: //LD r16, imm16 | load 16 bit value imm16 into r16
         sprintf(last_opcode, "LD r16, imm16");
-        instruction_result = (InstructionResult){0,0,3,3};
-        imm16 = read_word(ram, (*reg).PC+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,3};
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
         set_r16(reg, (opcode>>4)&3, imm16);
         break;
     case 2: //LD [r16mem], A | load contents of r8A to the byte pointed to by [r16mem], conditionally incrementing HL
         sprintf(last_opcode, "LD [r16mem], A");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         if (((opcode>>4)&3) == 2) {
-            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, R8A));
+            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, ram, R8A));
             set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
         } else if (((opcode>>4)&3) == 3) {
-            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, R8A));
+            write_byte(ram, get_r16(reg, R16HL), get_r8(reg, ram, R8A));
             set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
         } else {
-            write_byte(ram, get_r16(reg, (opcode>>4)&3), get_r8(reg, R8A));
+            write_byte(ram, get_r16(reg, (opcode>>4)&3), get_r8(reg, ram, R8A));
         }
         break;
     case 10: //LD A, [r16mem] | load byte pointed to by [r16mem] into A, conditionally incrementing HL
         sprintf(last_opcode, "LD A, [r16mem]");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         if (((opcode>>4)&3) == 2) {
-            set_r8(reg, R8A, read_byte(ram, get_r16(reg, R16HL)));
+            set_r8(reg, ram, R8A, read_byte(ram, get_r16(reg, R16HL)));
             set_r16(reg, R16HL, get_r16(reg, R16HL)+1);
         } else if (((opcode>>4)&3) == 3) {
-            set_r8(reg, R8A, read_byte(ram, get_r16(reg, R16HL)));
+            set_r8(reg, ram, R8A, read_byte(ram, get_r16(reg, R16HL)));
             set_r16(reg, R16HL, get_r16(reg, R16HL)-1);
         } else {
-            set_r8(reg, R8A, read_byte(ram, get_r16(reg, (opcode>>4)&3)));
+            set_r8(reg, ram, R8A, read_byte(ram, get_r16(reg, (opcode>>4)&3)));
         }
         break;
     case 3: //INC r16 | increment r16
         sprintf(last_opcode, "INC r16");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         set_r16(reg, (opcode>>4)&3, get_r16(reg,(opcode>>4)&3)+1);
         break;
     case 11: //DEC r16 | decrement r16
         sprintf(last_opcode, "DEC r16");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         set_r16(reg, (opcode>>4)&3, get_r16(reg,(opcode>>4)&3)-1);
         break;
     case 9: //ADD HL, r16 | add value in r16 to HL
         sprintf(last_opcode, "ADD HL, r16");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         uint16_t old_hl = get_r16(reg, R16HL);
         set_r16(reg, R16HL,old_hl+get_r16(reg, (opcode>>4)&3));
         set_flag(reg, NFLAG, 0);
         set_flag(reg, CFLAG, get_r16(reg, R16HL)<old_hl);
-        set_flag(reg, HFLAG, (old_hl&0x0FFF)+(get_r16(reg, (opcode>>4)&3)&0x0FFF)>=0x1000);
+        set_flag(reg, HFLAG, (get_r16(reg, R16HL)&4095)<(old_hl&4095));
         break;
     case 4:
     case 12: //INC r8 | increment r8
         sprintf(last_opcode, "INC r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, (opcode>>3)&7, get_r8(reg, ram, (opcode>>3)&7)+1);
         set_flag(reg, NFLAG, 0);
-        set_flag(reg, ZFLAG, get_r8(reg, (opcode>>3)&7)==0);
-        set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==16);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, (opcode>>3)&7)==0);
+        set_flag(reg, HFLAG, (get_r8(reg, ram, (opcode>>3)&7)&15) == 0);
         break;
     case 5:
     case 13: //DEC r8 | decrement r8
         sprintf(last_opcode, "DEC r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, (opcode>>3)&7, get_r8(reg, (opcode>>3)&7)-1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        working8bit = get_r8(reg, ram, (opcode>>3)&7)-1;
+        set_r8(reg, ram, (opcode>>3)&7, working8bit);
         set_flag(reg, NFLAG, 1);
-        set_flag(reg, ZFLAG, get_r8(reg, (opcode>>3)&7)==0);
-        set_flag(reg, HFLAG, get_r8(reg, (opcode>>3)&7)==15);
+        set_flag(reg, ZFLAG, working8bit==0);
+        set_flag(reg, HFLAG, (working8bit&15)==15);
         break;
     case 6:
     case 14: //LD r8, imm8 | load value imm8 into r8
         sprintf(last_opcode, "LD r8, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, (opcode>>3)&7, imm8);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, (opcode>>3)&7, imm8);
         break;
         
     default:; //Unknown opcode
         fprintf(stderr, "Error: Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
-            (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
+            get_r16(reg, R16PC),opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
             (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
         exit(EXIT_FAILURE);
         break;
@@ -253,8 +252,8 @@ InstructionResult block01(uint8_t* ram, Registers* reg, uint8_t opcode) {
         instruction_result = (InstructionResult){1,0,1,0};
     } else { //LD r8, r8 | load r8 into r8
         sprintf(last_opcode, "LD r8, r8");
-        instruction_result = (InstructionResult){0,0,1,0};
-        set_r8(reg, (opcode>>3)&7, get_r8(reg, opcode&7));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,0};
+        set_r8(reg, ram, (opcode>>3)&7, get_r8(reg, ram, opcode&7));
     }
 
     return instruction_result;
@@ -275,86 +274,85 @@ InstructionResult block10(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0: //ADD A, r8 | add contents of r8 to A
         sprintf(last_opcode, "ADD A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, R8A, get_r8(reg, R8A) + get_r8(reg, opcode&7));
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) + get_r8(reg, ram, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)<get_r8(reg, opcode&7));
-        set_flag(reg, HFLAG, (get_r8(reg, R8A)&15)<(get_r8(reg, opcode&7)&15));
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)<get_r8(reg, ram, opcode&7));
+        set_flag(reg, HFLAG, (get_r8(reg, ram, R8A)&15)<(get_r8(reg, ram, opcode&7)&15));
         break;
     case 1: //ADC A, r8 | add carry and contents of r8 to A
         sprintf(last_opcode, "ADC A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        working16bit = get_r8(reg, R8A) + get_r8(reg, opcode&7) + get_flag(reg, CFLAG);
-        working8bit = get_r8(reg, R8A)&15 + (get_r8(reg, opcode&7)&15) + get_flag(reg, CFLAG);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        working16bit = get_r8(reg, ram, R8A) + get_r8(reg, ram, opcode&7) + get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, ram, R8A)&15) + (get_r8(reg, ram, opcode&7)&15) + get_flag(reg, CFLAG);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 2: //SUB A, r8 | subtract contents of r8 from A
         sprintf(last_opcode, "SUB A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
-        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        working16bit = get_r8(reg, ram, R8A) - get_r8(reg, ram, opcode&7);
+        working8bit = (get_r8(reg, ram, R8A)&15) - (get_r8(reg, ram, opcode&7)&15);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 1);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 3: //SBC A, r8 | subtract carry and contents of r8 to A
         sprintf(last_opcode, "SBC A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7) - get_flag(reg, CFLAG);
-        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15) - get_flag(reg, CFLAG);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        working16bit = get_r8(reg, ram, R8A) - get_r8(reg, ram, opcode&7) - get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, ram, R8A)&15) - (get_r8(reg, ram, opcode&7)&15) - get_flag(reg, CFLAG);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 1);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 4: //AND A, r8 | logical and between r8 and A
         sprintf(last_opcode, "AND A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, R8A, get_r8(reg, R8A) & get_r8(reg, opcode&7));
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) & get_r8(reg, ram, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 1);
         set_flag(reg, CFLAG, 0);
         break;
     case 5: //XOR A, r8 | logical xor between r8 and A
         sprintf(last_opcode, "XOR A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, R8A, get_r8(reg, R8A) ^ get_r8(reg, opcode&7));
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) ^ get_r8(reg, ram, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, 0);
         break;
     case 6: //OR A, r8 | logical or between r8 and A
         sprintf(last_opcode, "OR A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        set_r8(reg, R8A, get_r8(reg, R8A) | get_r8(reg, opcode&7));
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) | get_r8(reg, ram, opcode&7));
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, 0);
         break;
     case 7: //CP A, r8 | subtract contents of r8 from A but discard result
         sprintf(last_opcode, "CP A, r8");
-        instruction_result = (InstructionResult){0,0,1,1};
-        working16bit = get_r8(reg, R8A) - get_r8(reg, opcode&7);
-        working8bit = (get_r8(reg, R8A)&15) - (get_r8(reg, opcode&7)&15);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
+        imm8 = get_r8(reg, ram, opcode&7);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==imm8);
         set_flag(reg, NFLAG, 1);
-        set_flag(reg, CFLAG, working16bit>>8>0);
-        set_flag(reg, HFLAG, working8bit>>4>0);
+        set_flag(reg, CFLAG, imm8 > get_r8(reg, ram, R8A));
+        set_flag(reg, HFLAG, (imm8&15) > (get_r8(reg, ram, R8A)&15));
         break;
     default:;
         fprintf(stderr, "Error: Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
-            (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
+            get_r16(reg, R16PC),opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
             (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
         exit(EXIT_FAILURE);
     }
@@ -371,88 +369,112 @@ InstructionResult prefixCB(uint8_t* ram, Registers* reg, uint8_t opcode) {
     uint8_t imm8;
     bool workingflag;
     uint8_t has_finished = 1;
-    switch (opcode>>3)
+    switch (opcode>>6)
     {
-    case 0b00000: //RLC r8 | bit-shift rotate register r8 left, store wraparound into C
-        sprintf(last_opcode, "RLC r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))>>7);
-        working8bit = (get_r8(reg, (opcode&7)) << 1) + get_flag(reg, CFLAG);
-        set_r8(reg, (opcode&7), working8bit);
-        set_flag(reg, ZFLAG, 0);
-        set_flag(reg, HFLAG, 0);
+    case 1: //BIT b3, r8 | set zflag to bit b3 in r8
+        sprintf(last_opcode, "BIT b3, r8");
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,3};
+        working8bit = (opcode>>3)&7;
+        set_flag(reg, ZFLAG, get_r8(reg, ram, opcode&7) & (1<<working8bit));
+        set_flag(reg, HFLAG, 1);
         set_flag(reg, NFLAG, 0);
         break;
-    case 0b00001: //RRC r8 | bit-shift rotate register r8 right, store wraparound into C
-        sprintf(last_opcode, "RRC r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))&1);
-        working8bit = (get_r8(reg, (opcode&7)) >> 1) + (get_flag(reg, CFLAG)<<7);
-        set_r8(reg, (opcode&7), working8bit);
-        set_flag(reg, ZFLAG, 0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
+    case 2: //RES b3, r8 | reset bit b3 in r8 to 0
+        sprintf(last_opcode, "RES b3, r8");
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,4};
+        working8bit = (opcode>>3)&7;
+        set_r8(reg, ram, opcode&7, get_r8(reg, ram, opcode&7) & ~(1<<working8bit));
         break;
-    case 0b00010: //RL r8 | bit-shift rotate register r8 left, through C
-        sprintf(last_opcode, "RL r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        workingflag = get_flag(reg, CFLAG);
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))>>7);
-        working8bit = (get_r8(reg, (opcode&7)) << 1) + workingflag;
-        set_r8(reg, (opcode&7), working8bit);
-        set_flag(reg, ZFLAG, 0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
+    case 3: //SET b3, r8 | set bit b3 in r8 to 1
+        sprintf(last_opcode, "SET b3, r8");
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,4};
+        working8bit = (opcode>>3)&7;
+        set_r8(reg, ram, opcode&7, get_r8(reg, ram, opcode&7) | (1<<working8bit));
         break;
-    case 0b00011: //RR r8 | bit-shift rotate register r8 right, through C
-        sprintf(last_opcode, "RR r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        workingflag = get_flag(reg, CFLAG);
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))&1);
-        working8bit = (get_r8(reg, (opcode&7)) >> 1) + (workingflag<<7);
-        set_r8(reg, (opcode&7), working8bit);
-        set_flag(reg, ZFLAG, 0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
-        break;
-    case 0b00100: //SLA r8 | bit-shit arithmetically register r8 left, into C
-        sprintf(last_opcode, "SLA r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7)) >> 7);
-        set_r8(reg, (opcode&7), get_r8(reg, (opcode&7))<<1);
-        set_flag(reg, ZFLAG, get_r8(reg, (opcode&7))==0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
-        break;
-    case 0b00101: //SRA r8 | bit-shit arithmetically register r8 right, into C
-        sprintf(last_opcode, "SRA r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))&1);
-        set_r8(reg, (opcode&7), get_r8(reg, (opcode&7))>>1 + get_r8(reg, (opcode&7))&128);
-        set_flag(reg, ZFLAG, get_r8(reg, (opcode&7))==0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
-        break;
-    case 0b00110: //SWAP r8 | swap upper 4 and lower 4 bits in register r8
-        sprintf(last_opcode, "SWAP r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        imm8 = get_r8(reg, (opcode&7)) << 4;
-        set_r8(reg, (opcode&7), get_r8(reg, imm8 + (opcode&7)) >> 4);
-        break;
-    case 0b00111: //SRL r8 | bit-shift logically register r8 right, into C
-        sprintf(last_opcode, "SRL r8");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_flag(reg, CFLAG, get_r8(reg, (opcode&7))&1);
-        set_r8(reg, (opcode&7), get_r8(reg, (opcode&7))>>1);
-        set_flag(reg, ZFLAG, get_r8(reg, (opcode&7))==0);
-        set_flag(reg, HFLAG, 0);
-        set_flag(reg, NFLAG, 0);
-        break;
-    default:;
-        fprintf(stderr, "Error: Unknown 0xCB prefixed opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
-            (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
-            (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
-        exit(EXIT_FAILURE);
+    default:
+        switch (opcode>>3)
+        {
+        case 0b00000: //RLC r8 | bit-shift rotate register r8 left, store wraparound into C
+            sprintf(last_opcode, "RLC r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))>>7);
+            working8bit = (get_r8(reg, ram, (opcode&7)) << 1) + get_flag(reg, CFLAG);
+            set_r8(reg, ram, (opcode&7), working8bit);
+            set_flag(reg, ZFLAG, 0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00001: //RRC r8 | bit-shift rotate register r8 right, store wraparound into C
+            sprintf(last_opcode, "RRC r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))&1);
+            working8bit = (get_r8(reg, ram, (opcode&7)) >> 1) + (get_flag(reg, CFLAG)<<7);
+            set_r8(reg, ram, (opcode&7), working8bit);
+            set_flag(reg, ZFLAG, 0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00010: //RL r8 | bit-shift rotate register r8 left, through C
+            sprintf(last_opcode, "RL r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            workingflag = get_flag(reg, CFLAG);
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))>>7);
+            working8bit = (get_r8(reg, ram, (opcode&7)) << 1) + workingflag;
+            set_r8(reg, ram, (opcode&7), working8bit);
+            set_flag(reg, ZFLAG, 0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00011: //RR r8 | bit-shift rotate register r8 right, through C
+            sprintf(last_opcode, "RR r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            workingflag = get_flag(reg, CFLAG);
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))&1);
+            working8bit = (get_r8(reg, ram, (opcode&7)) >> 1) + (workingflag<<7);
+            set_r8(reg, ram, (opcode&7), working8bit);
+            set_flag(reg, ZFLAG, (working8bit==0));
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00100: //SLA r8 | bit-shit arithmetically register r8 left, into C
+            sprintf(last_opcode, "SLA r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7)) >> 7);
+            set_r8(reg, ram, (opcode&7), get_r8(reg, ram, (opcode&7))<<1);
+            set_flag(reg, ZFLAG, get_r8(reg, ram, (opcode&7))==0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00101: //SRA r8 | bit-shit arithmetically register r8 right, into C
+            sprintf(last_opcode, "SRA r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))&1);
+            set_r8(reg, ram, (opcode&7), get_r8(reg, ram, (opcode&7))>>1 + get_r8(reg, ram, (opcode&7))&128);
+            set_flag(reg, ZFLAG, get_r8(reg, ram, (opcode&7))==0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        case 0b00110: //SWAP r8 | swap upper 4 and lower 4 bits in register r8
+            sprintf(last_opcode, "SWAP r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            imm8 = get_r8(reg, ram, (opcode&7)) << 4;
+            set_r8(reg, ram, (opcode&7), imm8 + get_r8(reg, ram, (opcode&7)) >> 4);
+            break;
+        case 0b00111: //SRL r8 | bit-shift logically register r8 right, into C
+            sprintf(last_opcode, "SRL r8");
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+            set_flag(reg, CFLAG, get_r8(reg, ram, (opcode&7))&1);
+            set_r8(reg, ram, (opcode&7), get_r8(reg, ram, (opcode&7))>>1);
+            set_flag(reg, ZFLAG, get_r8(reg, ram, (opcode&7))==0);
+            set_flag(reg, HFLAG, 0);
+            set_flag(reg, NFLAG, 0);
+            break;
+        default:;
+            fprintf(stderr, "Error: Unknown 0xCB prefixed opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
+                get_r16(reg, R16PC),opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
+                (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
+            exit(EXIT_FAILURE);
+        }
     }
     return instruction_result;
 }
@@ -472,90 +494,88 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     {
     case 0b11000110: //ADD A, imm8 | add contents of imm8 to A
         sprintf(last_opcode, "ADD A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, R8A, get_r8(reg, R8A) + imm8);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) + imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
-        set_flag(reg, CFLAG, get_r8(reg, R8A)<imm8);
-        set_flag(reg, HFLAG, (get_r8(reg, R8A)&15)<(imm8&15));
+        set_flag(reg, CFLAG, get_r8(reg, ram, R8A)<imm8);
+        set_flag(reg, HFLAG, (get_r8(reg, ram, R8A)&15)<(imm8&15));
         break;
     case 0b11001110: //ADC A, imm8 | add carry and contents of imm8 to A
         sprintf(last_opcode, "ADC A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        working16bit = get_r8(reg, R8A) + imm8 + get_flag(reg, CFLAG);
-        working8bit = get_r8(reg, R8A)&15 + (imm8&15) + get_flag(reg, CFLAG);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        working16bit = get_r8(reg, ram, R8A) + imm8 + get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, ram, R8A)&15) + (imm8&15) + get_flag(reg, CFLAG);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 0b11010110: //SUB A, imm8 | subtract contents of imm8 from A
         sprintf(last_opcode, "SUB A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        working16bit = get_r8(reg, R8A) - imm8;
-        working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        working16bit = get_r8(reg, ram, R8A) - imm8;
+        working8bit = (get_r8(reg, ram, R8A)&15) - (imm8&15);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 1);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 0b11011110: //SBC A, imm8 | subtract carry and contents of imm8 to A
         sprintf(last_opcode, "SBC A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        working16bit = get_r8(reg, R8A) - imm8 - get_flag(reg, CFLAG);
-        working8bit = (get_r8(reg, R8A)&15) - (imm8&15) - get_flag(reg, CFLAG);
-        set_r8(reg, R8A, (uint8_t)working16bit);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        working16bit = get_r8(reg, ram, R8A) - imm8 - get_flag(reg, CFLAG);
+        working8bit = (get_r8(reg, ram, R8A)&15) - (imm8&15) - get_flag(reg, CFLAG);
+        set_r8(reg, ram, R8A, (uint8_t)working16bit);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 1);
         set_flag(reg, CFLAG, working16bit>>8>0);
         set_flag(reg, HFLAG, working8bit>>4>0);
         break;
     case 0b11100110: //AND A, imm8 | logical and between imm8 and A
         sprintf(last_opcode, "AND A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, R8A, get_r8(reg, R8A) & imm8);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) & imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 1);
         set_flag(reg, CFLAG, 0);
         break;
     case 0b11101110: //XOR A, imm8 | logical xor between imm8 and A
         sprintf(last_opcode, "XOR A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, R8A, get_r8(reg, R8A) ^ imm8);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) ^ imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, 0);
         break;
     case 0b11110110: //OR A, imm8 | logical or between imm8 and A
         sprintf(last_opcode, "OR A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, R8A, get_r8(reg, R8A) | imm8);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, get_r8(reg, ram, R8A) | imm8);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==0);
         set_flag(reg, NFLAG, 0);
         set_flag(reg, HFLAG, 0);
         set_flag(reg, CFLAG, 0);
         break;
     case 0b11111110: //CP A, imm8 | subtract contents of imm8 from A but discard result
         sprintf(last_opcode, "CP A, imm8");
-        instruction_result = (InstructionResult){0,0,2,2};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        working16bit = get_r8(reg, R8A) - imm8;
-        working8bit = (get_r8(reg, R8A)&15) - (imm8&15);
-        set_flag(reg, ZFLAG, get_r8(reg, R8A)==0);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,2};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_flag(reg, ZFLAG, get_r8(reg, ram, R8A)==imm8);
         set_flag(reg, NFLAG, 1);
-        set_flag(reg, CFLAG, working16bit>>8>0);
-        set_flag(reg, HFLAG, working8bit>>4>0);
+        set_flag(reg, CFLAG, imm8 > get_r8(reg, ram, R8A));
+        set_flag(reg, HFLAG, (imm8&15) > (get_r8(reg, ram, R8A)&15));
         break;
     case 0b11000000:
     case 0b11001000:
@@ -563,23 +583,20 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011000: //RET cond | conditional return
         sprintf(last_opcode, "RET cond");
         if (is_cc(reg, (opcode>>3)&3)) {
-            instruction_result = (InstructionResult){0,0,0,5};
-            (*reg).PC = read_word(ram, (*reg).SP);
+            instruction_result = (InstructionResult){0,0,read_word(ram, (*reg).SP),5};
             (*reg).SP+=2;
         } else {
-            instruction_result = (InstructionResult){0,0,1,2};
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         }
         break;
     case 0b11001001: //RET | return
         sprintf(last_opcode, "RET");
-        instruction_result = (InstructionResult){0,0,0,4};
-        (*reg).PC = read_word(ram, (*reg).SP);
+        instruction_result = (InstructionResult){0,0,read_word(ram, (*reg).SP),4};
         (*reg).SP+=2;
         break;
     case 0b11011001: //RETI | return and enable IME
         sprintf(last_opcode, "RETI");
-        instruction_result = (InstructionResult){0,0,0,4};
-        (*reg).PC = read_word(ram, (*reg).SP);
+        instruction_result = (InstructionResult){0,0,read_word(ram, (*reg).SP),4};
         (*reg).SP+=2;
         set_ime(reg, 1);
         break;
@@ -589,23 +606,20 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011010: //JP cond, imm16 | conditional jump to imm16
         sprintf(last_opcode, "JP cond, imm16");
         if (is_cc(reg, (opcode>>3)&3)) {
-            instruction_result = (InstructionResult){0,0,0,4};
-            imm16 = read_word(ram, (*reg).PC+1);
-            set_r16(reg, R16PC, imm16);
+            imm16 = read_word(ram, get_r16(reg, R16PC)+1);
+            instruction_result = (InstructionResult){0,0,imm16,4};
         } else {
-            instruction_result = (InstructionResult){0,0,3,3};
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,3};
         }
         break;
     case 0b11000011: //JP, imm16 | jump to imm16
         sprintf(last_opcode, "JP imm16");
-        instruction_result = (InstructionResult){0,0,0,3};
-        imm16 = read_word(ram, (*reg).PC+1);
-        set_r16(reg, R16PC, imm16);
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
+        instruction_result = (InstructionResult){0,0,imm16,3};
         break;
     case 0b11101001: //JP, HL | jump to address in HL
         sprintf(last_opcode, "JP, HL");
-        instruction_result = (InstructionResult){0,0,0,1};
-        set_r16(reg, R16PC, get_r16(reg, R16HL));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16HL),1};
         break;
     case 0b11000100:
     case 0b11001100:
@@ -613,24 +627,22 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11011100: //CALL cond, imm16 | conditional call to imm16
         sprintf(last_opcode, "CALL cond, imm16");
         if (is_cc(reg, (opcode>>3)&3)) {
-            instruction_result = (InstructionResult){0,0,0,6};
-            imm16 = read_word(ram, (*reg).PC+1);
+            imm16 = read_word(ram, get_r16(reg, R16PC)+1);
             (*reg).SP-=2;
             (*reg).PC+=3;
-            write_word(ram, (*reg).SP, (*reg).PC);
-            set_r16(reg, R16PC, get_r16(reg, imm16));
+            write_word(ram, (*reg).SP, get_r16(reg, R16PC));
+            instruction_result = (InstructionResult){0,0,imm16,6};
         } else {
-            instruction_result = (InstructionResult){0,0,3,3};
+            instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,3};
         }
         break;
     case 0b11001101: //CALL, imm16 | call to imm16
         sprintf(last_opcode, "CALL, imm16");
-        instruction_result = (InstructionResult){0,0,0,6};
-        imm16 = read_word(ram, (*reg).PC+1);
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
         (*reg).SP-=2;
         (*reg).PC+=3;
-        write_word(ram, (*reg).SP, (*reg).PC);
-        set_r16(reg, R16PC, imm16);
+        write_word(ram, (*reg).SP, get_r16(reg, R16PC));
+        instruction_result = (InstructionResult){0,0,imm16,6};
         break;
     case 0b11000111:
     case 0b11001111:
@@ -641,19 +653,18 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11110111:
     case 0b11111111: //RST vec | CALL to address vec*8
         sprintf(last_opcode, "RST vec");
-        instruction_result = (InstructionResult){0,0,0,4};
         working16bit = ((opcode>>2)&7)*8;
+        instruction_result = (InstructionResult){0,0,working16bit,4};
         (*reg).SP-=2;
         (*reg).PC+=1;
-        write_word(ram, (*reg).SP, (*reg).PC);
-        set_r16(reg, R16PC, working16bit);
+        write_word(ram, (*reg).SP, get_r16(reg, R16PC));
         break;
     case 0b11000001:
     case 0b11010001:
     case 0b11100001:
     case 0b11110001: //POP r16stk | pop register from stack into r16stk
         sprintf(last_opcode, "POP r16stk");
-        instruction_result = (InstructionResult){0,0,1,3};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,3};
         working16bit = read_word(ram, (*reg).SP);
         (*reg).SP+=2;
         switch ((opcode>>4)&3)
@@ -677,7 +688,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
     case 0b11100101:
     case 0b11110101: //PUSH r16stk | push register from r16stk into stack
         sprintf(last_opcode, "PUSH r16stk");
-        instruction_result = (InstructionResult){0,0,1,4};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,4};
         switch ((opcode>>4)&3)
         {
         case 0:
@@ -697,86 +708,74 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         write_word(ram, (*reg).SP, working16bit);
         break;
     case 0b11001011: // All prefixed 0xCB opcodes
-        instruction_result = prefixCB(ram, reg, *(&((*reg).PC)+1));
-        instruction_result.pc_offset += 1;
+        instruction_result = prefixCB(ram, reg, *(ram+get_r16(reg, R16PC)+1));
         break;
     case 0b11100010: // LDH [c], A | load the byte in A to [0xFF00+C]
         sprintf(last_opcode, "LDH [c], A");
-        instruction_result = (InstructionResult){0,0,1,2};
-        write_byte(ram, 0xFF00+get_r8(reg, R8C), get_r8(reg, R8A));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
+        write_byte(ram, 0xFF00+get_r8(reg, ram, R8C), get_r8(reg, ram, R8A));
         break;
     case 0b11100000: // LDH [imm8], A | load the byte in A to [0xFF00+imm8]
         sprintf(last_opcode, "LDH [imm8], A");
-        instruction_result = (InstructionResult){0,0,2,3};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        write_byte(ram, 0xFF00+imm8, get_r8(reg, R8A));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,3};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        write_byte(ram, 0xFF00+imm8, get_r8(reg, ram, R8A));
         break;
     case 0b11101010: // LD [imm16], A | load the byte in A to [imm16]
         sprintf(last_opcode, "LD [imm16], A");
-        instruction_result = (InstructionResult){0,0,3,4};
-        imm16 = read_word(ram, (*reg).PC+1);
-        write_byte(ram, imm16, get_r8(reg, R8A));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,4};
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
+        write_byte(ram, imm16, get_r8(reg, ram, R8A));
         break;
     case 0b11110010: // LDH A, [c] | load the byte in [0xFF00+C] to A
         sprintf(last_opcode, "LDH A, [c]");
-        instruction_result = (InstructionResult){0,0,1,2};
-        set_r8(reg, R8A, read_byte(ram, 0xFF00+get_r8(reg, R8C)));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
+        set_r8(reg, ram, R8A, read_byte(ram, 0xFF00+get_r8(reg, ram, R8C)));
         break;
     case 0b11110000: // LDH A, [imm8] | load the byte in [0xFF00+imm8] to A
         sprintf(last_opcode, "LDH A, [imm8]");
-        instruction_result = (InstructionResult){0,0,2,3};
-        imm8 = read_byte(ram, (*reg).PC+1);
-        set_r8(reg, R8A, read_byte(ram, 0xFF00+imm8));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,3};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, read_byte(ram, 0xFF00+imm8));
         break;
     case 0b11111010: // LD A, [imm16] | load the byte in [imm16] to A
         sprintf(last_opcode, "LD A, [imm16]");
-        instruction_result = (InstructionResult){0,0,3,4};
-        imm16 = read_word(ram, (*reg).PC+1);
-        set_r8(reg, R8A, read_byte(ram, imm16));
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+3,4};
+        imm16 = read_word(ram, get_r16(reg, R16PC)+1);
+        set_r8(reg, ram, R8A, read_byte(ram, imm16));
         break;
-    case 0b11101000: // ADD SP, imm8 | add imm8 to SP
+    case 0b11101000: // ADD SP, imm8 | add SIGNED imm8 to SP
         sprintf(last_opcode, "ADD SP, imm8");
-        instruction_result = (InstructionResult){0,0,2,4};
-        imm8 = read_byte(ram, (*reg).PC+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,4};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
         working16bit = get_r16(reg, R16SP);
         set_r16(reg, R16SP, working16bit + (int8_t)imm8);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, NFLAG, 0);
-        if ((int8_t)imm8 >= 0) {
-            set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<imm8);
-            set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<(imm8&15));
-        } else {
-            working8bit = (imm8&0x8F); // "bitmask" a negative number
-            set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<working16bit);
-            set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<((int8_t)working8bit));
-        }
+        set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<imm8);
+        set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<(imm8&15));
+
         break; 
     case 0b11111000: // LD HL, SP + imm8 | add imm8 to SP and copy result to HL
         sprintf(last_opcode, "LD HL, SP + imm8");
-        instruction_result = (InstructionResult){0,0,2,3};
-        imm8 = read_byte(ram, (*reg).PC+1);
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+2,3};
+        imm8 = read_byte(ram, get_r16(reg, R16PC)+1);
         working16bit = get_r16(reg, R16SP);
-        set_r16(reg, R16SP, working16bit + (int8_t)imm8);
-        set_r16(reg, R16HL, get_r16(reg, R16SP));
+        set_r16(reg, R16HL, working16bit + (int8_t)imm8);
         set_flag(reg, ZFLAG, 0);
         set_flag(reg, NFLAG, 0);
-        if ((int8_t)imm8 >= 0) {
-            set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<imm8);
-            set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<(imm8&15));
-        } else {
-            working8bit = (imm8&0x8F); // "bitmask" a negative number
-            set_flag(reg, CFLAG, (get_r16(reg, R16SP)&255)<working16bit);
-            set_flag(reg, HFLAG, (get_r16(reg, R16SP)&15)<((int8_t)working8bit));
-        }
+        set_flag(reg, CFLAG, (get_r16(reg, R16HL)&255)<imm8);
+        set_flag(reg, HFLAG, (get_r16(reg, R16HL)&15)<(imm8&15));
+
         break;
     case 0b11111001: //LD SP, HL | copy HL into SP
         sprintf(last_opcode, "LD SP, HL");
-        instruction_result = (InstructionResult){0,0,1,2};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,2};
         set_r16(reg, R16SP, get_r16(reg, R16HL));
         break;
     case 0b11110011: //DI | disable interrupts
         sprintf(last_opcode, "DI");
-        instruction_result = (InstructionResult){0,0,1,1};
+        instruction_result = (InstructionResult){0,0,get_r16(reg, R16PC)+1,1};
         set_ime(reg, 0);
         break;
     case 0b11111011: //EI | enable interrupts
@@ -785,7 +784,7 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
         break;
     default:;
         fprintf(stderr, "Error: Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
-            (*reg).PC,opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
+            get_r16(reg, R16PC),opcode,(opcode>>7)&1,(opcode>>6)&1,(opcode>>5)&1,(opcode>>4)&1,
             (opcode>>3)&1,(opcode>>2)&1,(opcode>>1)&1,(opcode>>0)&1);
         exit(EXIT_FAILURE);
     }
@@ -795,12 +794,16 @@ InstructionResult block11(uint8_t* ram, Registers* reg, uint8_t opcode) {
 
 InstructionResult run_instruction(uint8_t* ram, Registers* reg) {
     /* read the opcode at the PC and execute an instruction */
-    uint8_t opcode = read_byte(ram, (*reg).PC);
-    // printf("PC=0x%.4x OPCODE=0x%.2x BITS=",(*reg).PC, opcode);
-    // for (int8_t i=7; i>=0; i--) {
-    //     printf("%d", (opcode>>i) & 1);
-    // }
-    // printf("\n");
+    uint8_t opcode = read_byte(ram, get_r16(reg, R16PC));
+
+    printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x",
+    get_r8(reg, ram, R8A),get_r8(reg, ram, R8F),get_r8(reg, ram, R8B),get_r8(reg, ram, R8C),
+    get_r8(reg, ram, R8D),get_r8(reg, ram, R8E),get_r8(reg, ram, R8H),get_r8(reg, ram, R8L),
+    get_r16(reg, R16SP),get_r16(reg, R16PC),
+    *(ram+get_r16(reg, R16PC)),*(ram+get_r16(reg, R16PC)+1),*(ram+get_r16(reg, R16PC)+2),*(ram+get_r16(reg, R16PC)+3)
+    );
+
+
     InstructionResult instruction_result;
     switch (opcode>>6)
     {
@@ -817,12 +820,6 @@ InstructionResult run_instruction(uint8_t* ram, Registers* reg) {
         instruction_result = block11(ram, reg, opcode);
         break;
     }
-    printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x",
-        get_r8(reg, R8A),get_r8(reg, R8F),get_r8(reg, R8B),get_r8(reg, R8C),
-        get_r8(reg, R8D),get_r8(reg, R8E),get_r8(reg, R8H),get_r8(reg, R8L),
-        get_r16(reg, R16SP),get_r16(reg, R16PC),
-        *(ram+get_r16(reg, R16PC)),*(ram+get_r16(reg, R16PC)+1),*(ram+get_r16(reg, R16PC)+2),*(ram+get_r16(reg, R16PC)+3)
-    );
     printf(" OPCODE:%s", last_opcode);
     printf("\n");
     sprintf(last_opcode, "--");

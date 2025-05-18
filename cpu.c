@@ -49,7 +49,7 @@ void set_flag(Registers *reg, uint8_t flagname, bool state) {
 }
 
 
-uint8_t get_r8(Registers *reg, uint8_t regname) {
+uint8_t get_r8(Registers *reg, uint8_t* ram, uint8_t regname) {
     /* get the state associated with the given 8-bit reg */
     switch (regname)
     {
@@ -69,14 +69,17 @@ uint8_t get_r8(Registers *reg, uint8_t regname) {
         return (*reg).HL >> 8;
     case R8L:
         return (*reg).HL & 0xFF;
-    
-    default:
-        return 0;
+    case 6:
+        return read_byte(ram, (*reg).HL);
+    default:;
+        char msg[32];
+        sprintf(msg, "Invalid register id (%d).", regname);
+        print_error(msg);
     }
 }
 
 
-void set_r8(Registers *reg, uint8_t regname, uint8_t value) {
+void set_r8(Registers *reg, uint8_t* ram, uint8_t regname, uint8_t value) {
     /* set the state of the given 8-bit reg */
         switch (regname)
     {
@@ -108,6 +111,13 @@ void set_r8(Registers *reg, uint8_t regname, uint8_t value) {
         (*reg).HL &= 0xFF00; //clear
         (*reg).HL |= value; //set
         break;
+    case 6:
+        write_byte(ram, (*reg).HL, value);
+        break;
+    default:;
+        char msg[32];
+        sprintf(msg, "Invalid register id (%d).", regname);
+        print_error(msg);
     }
 }
 
@@ -161,14 +171,14 @@ bool is_cc(Registers *reg, uint8_t cond) {
     /* checks if a condition is met */
     switch (cond)
     {
-    case 0b00: // is Z set
-        return get_flag(reg, ZFLAG);
-    case 0b01: // is Z not set
+    case 0b00: // is Z not set
         return !get_flag(reg, ZFLAG);
-    case 0b10: // is C set
-        return get_flag(reg, CFLAG);
-    case 0b11: // is C not set
+    case 0b01: // is Z not set
+        return get_flag(reg, ZFLAG);
+    case 0b10: // is C not set
         return !get_flag(reg, CFLAG);
+    case 0b11: // is C set
+        return get_flag(reg, CFLAG);
     
     default:
         fprintf(stderr, "Error: Unknown condition code!");
