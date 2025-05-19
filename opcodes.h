@@ -15,11 +15,11 @@ typedef struct
     uint8_t machine_cycles;
 } InstructionResult;
 
-InstructionResult block00(uint8_t* ram, uint8_t opcode);
-InstructionResult block01(uint8_t* ram, uint8_t opcode);
-InstructionResult block10(uint8_t* ram, uint8_t opcode);
-InstructionResult block11(uint8_t* ram, uint8_t opcode);
-InstructionResult prefixCB(uint8_t* ram, uint8_t opcode);
-InstructionResult run_instruction(uint8_t* ram);
+InstructionResult block00(uint8_t opcode);
+InstructionResult block01(uint8_t opcode);
+InstructionResult block10(uint8_t opcode);
+InstructionResult block11(uint8_t opcode);
+InstructionResult prefixCB(uint8_t opcode);
+InstructionResult run_instruction();
 
 #endif // OPCODES_H

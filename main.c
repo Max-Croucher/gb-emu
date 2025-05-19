@@ -26,6 +26,7 @@ Notes:
 #include "rom.h"
 #include "opcodes.h"
 #include "graphics.h"
+#include "mnemonics.h"
 
 #include <unistd.h>
 
@@ -93,6 +94,9 @@ int main(int argc, char *argv[]) {
     init_registers();
     InstructionResult instruction_result = {0,0,0,0};
     
+    FILE *logfile;
+	logfile = fopen("cpu_states.log", "w");
+
     bool do_ei = 0;
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     int16_t machine_timeout = 0;
@@ -119,12 +123,13 @@ int main(int argc, char *argv[]) {
         }
 
             if (!machine_timeout) {
-                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x",
+                fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x OPCODES: %s\n",
                 get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
                 get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
                 get_r16(R16SP),get_r16(R16PC),
                 *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                reg.IME, halt_state, *(ram+0xFF0F)
+                reg.IME, halt_state, *(ram+0xFF0F),
+                (*(ram+get_r16(R16PC))==0xCB) ? mn_opcodes[*(ram+get_r16(R16PC))] : mn_cb_opcodes[*(ram+get_r16(R16PC)+1)]
             );
 
             if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
@@ -137,7 +142,7 @@ int main(int argc, char *argv[]) {
                 }
             }
             if (halt_state == 0 || halt_state == 3) {
-                instruction_result = run_instruction(ram);
+                instruction_result = run_instruction();
 
                 //if (halt_state == 2) {instruction_result.new_pc = get_r16(R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
                 if (halt_state == 3) halt_state = 0;
@@ -164,6 +169,14 @@ int main(int argc, char *argv[]) {
         //usleep(10);
     }
     fprintf(stderr,"Processed %ld frames.\n", frames);
+
+    //write ram contents to a file
+    FILE *f;
+	f = fopen("ram_contents.hex", "wb");
+    fwrite(ram, 1, 0x10000, f);
+    fprintf(stderr, "written RAM to 'ram_contents.hex'.\n");
+    fclose(f);
+    fclose(logfile);
 
     //free mallocs
     free(rom.rom);

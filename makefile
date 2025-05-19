@@ -3,7 +3,7 @@ CFLAGS= -O4
 
 all: gbemu
 
-main.o: main.c cpu.h rom.h opcodes.h graphics.h
+main.o: main.c cpu.h rom.h opcodes.h graphics.h mnemonics.h
 	$(CC) -c $(CFLAGS) $< -o $@
 cpu.o: cpu.c cpu.h rom.h
 	$(CC) -c $(CFLAGS) $< -o $@
