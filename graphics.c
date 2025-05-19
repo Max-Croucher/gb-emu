@@ -29,25 +29,25 @@ GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
 
 void init_screen_tex(GLubyte texture[144][160][3]) {
-    /* initialise the screen texture */
-    for (int i=0; i<144; i++) {
-        float r = (float)((i+xoffset)%144) / 144.0 * 255.0;
-        for (int j=0; j<160; j++) {
-            float g = (float)j / 160 * 255.0;
-            texture[i][j][0] = (GLubyte)r;
-            texture[i][j][1] = (GLubyte)g;
-            texture[i][j][2] = (GLubyte)0;
-        }
-    }
-    for (int i=40; i < 60; i++) {
-        for (int j=40; j < 60; j++) {
-            texture[i][j][0] = (GLubyte)0;
-            texture[i][j][1] = (GLubyte)0;
-            texture[i][j][2] = (GLubyte)0;
+    // /* initialise the screen texture */
+    // for (int i=0; i<144; i++) {
+    //     float r = (float)((i+xoffset)%144) / 144.0 * 255.0;
+    //     for (int j=0; j<160; j++) {
+    //         float g = (float)j / 160 * 255.0;
+    //         texture[i][j][0] = (GLubyte)r;
+    //         texture[i][j][1] = (GLubyte)g;
+    //         texture[i][j][2] = (GLubyte)0;
+    //     }
+    // }
+    // for (int i=40; i < 60; i++) {
+    //     for (int j=40; j < 60; j++) {
+    //         texture[i][j][0] = (GLubyte)0;
+    //         texture[i][j][1] = (GLubyte)0;
+    //         texture[i][j][2] = (GLubyte)0;
             
-        }
+    //     }
             
-    }
+    // }
     glEnable(GL_TEXTURE_2D);
     glTexImage2D(GL_TEXTURE_2D,0,3,160,144,0,GL_RGB, GL_UNSIGNED_BYTE, texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -120,11 +120,20 @@ uint16_t interleave(uint16_t a, uint16_t b) {
     return a3 + b3;
 }
 
+uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
+    uint16_t base_addr;
+    if ((is_window_layer && (*(ram+0xFF40)&64)) || (!is_window_layer && (*(ram+0xFF40)&8))) {
+        base_addr = 0x9C00;
+    } else {
+        base_addr = 0x9800;
+    }
+    return *(ram + base_addr + tilepos);
+}
 
 uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
     /* get the memory address of a tile from the tile id and the addressing mode register */
     uint16_t tile_addr = 0x8000 + ((uint16_t)(tile_id))*16;
-    if (!(is_object) && tile_id < 128 && (*(ram+0xFF40)&8)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
+    if (!(is_object) && tile_id < 128 && !(*(ram+0xFF40)&16)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
     return tile_addr;
 }
 
@@ -167,9 +176,42 @@ uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline) {
     return objects_found;
 }
 
+uint8_t get_background_pallette(uint8_t pallette_id) {
+    /* poll the BGP register */
+    return (*(ram+0xFF44) >> (2*pallette_id))&3;
+}
 
 void draw_background(uint8_t scanline) {
     /* Draw the background layer on the current scanline */
+    char print_palette[4] = {' ', '.', 'o', '0'};
+    uint8_t top = scanline + *(ram+0xFF42); //get scroll vals
+    uint8_t left = *(ram+0xFF43);
+    uint8_t tileaddrs[21];
+    printf("Scanline %d tiles (T: %d, L: %d): \n", scanline, top, left);
+    for (int i=0; i<21; i++) {
+        uint8_t tile_id = get_tile_id((left>>3)+i + (top>>3)*32, 0);
+
+
+
+        printf("0x%.2x ", tile_id);
+        tileaddrs[i] = get_tile_addr(tile_id, 0);
+    }
+    printf("\n");
+
+    uint16_t current_tile[8];
+    uint8_t current_tile_pos = 0;
+    load_tile(current_tile,tileaddrs[left%8]);
+
+    for (int i=0; i<160; i++) {
+        if (((i+left)%8)==0) {
+            current_tile_pos = (i+(left%8))>>3;
+            load_tile(current_tile,tileaddrs[(i+(left%8))>>3]);
+        }
+        uint8_t pix = (current_tile[top%8] >> (2*(((i+left)%8))))&3;
+        printf("%d p=%d (%c) ", (i+left), current_tile_pos, print_palette[pix]);
+        texture[scanline][i][0],texture[scanline][i][1],texture[scanline][i][2] = get_background_pallette(pix);
+    }
+    printf("\n");
 }
 
 
@@ -193,8 +235,8 @@ bool tick_graphics(void) {
         *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
         xoffset++;
         if (xoffset == 144) xoffset = 0;
-        //glutMainLoopEvent();
-        //glutPostRedisplay();
+        glutMainLoopEvent();
+        glutPostRedisplay();
         print_tilemaps();
         end = clock();
         frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
@@ -231,19 +273,35 @@ bool tick_graphics(void) {
 void print_tilemaps(void) {
     printf("FRAME\n");
     char print_palette[4] = {' ', '.', 'o', '0'};
-    for (int i=0; i<32; i++) {
-        uint16_t tiles[16][8];
-        for (int j=0; j<16; j++) {
-            //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
-            load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
-        }
-        for (int k=0; k<8; k++) {
-            for (int j=0; j<16; j++) {
-                for (int l=7; l>=0; l--){
-                    printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
-                }
-            }
-            printf("\n");
-        }
-    }
+    // for (int i=0; i<32; i++) {
+    //     uint16_t tiles[16][8];
+    //     for (int j=0; j<16; j++) {
+    //         //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
+    //         load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
+    //     }
+    //     for (int k=0; k<8; k++) {
+    //         for (int j=0; j<16; j++) {
+    //             for (int l=7; l>=0; l--){
+    //                 printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
+    //             }
+    //         }
+    //         printf("\n");
+    //     }
+    // }
+
+    // for (int i=0; i<32; i++) {
+    //     uint16_t tiles[32][8];
+    //     for (int j=0; j<32; j++) {
+    //         printf("%d, %d: %d | %.4x\n", i, j, get_tile_id(j+i*32, 0), get_tile_addr(get_tile_id(j+i*32, 0),0));
+    //         load_tile(tiles[j], get_tile_addr(get_tile_id(j+i*32, 0),0));
+    //     }
+    //     for (int k=0; k<8; k++) {
+    //         for (int j=0; j<32; j++) {
+    //             for (int l=7; l>=0; l--){
+    //                 printf("%c", print_palette[get_background_pallette((tiles[j][k]>>(2*l))&3)]);
+    //             }
+    //         }
+    //         printf("\n");
+    //     }
+    // }
 }
