@@ -22,10 +22,10 @@ void gl_tick(void);
 void reshape(int w, int h);
 void init_graphics(int *argc, char *argv[]);
 uint16_t interleave(uint16_t a, uint16_t b);
-void load_tile(uint8_t* ram, uint16_t tile_data[8], uint8_t tile_id, bool is_object);
-uint8_t read_objects(uint8_t* ram, ObjectAttribute attrbank[10], uint8_t scanline);
-void tick_graphics(uint8_t *ram);
-void print_tilemaps(uint8_t *ram);
+void load_tile(uint16_t tile_data[8], uint8_t tile_id, bool is_object);
+uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline);
+bool tick_graphics(void);
+void print_tilemaps(void);
 
 
 

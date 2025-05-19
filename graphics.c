@@ -14,6 +14,8 @@
 #include "cpu.h"
 #include "graphics.h"
 
+extern uint8_t* ram;
+
 clock_t start,end;
 
 double frametime = 0;
@@ -21,7 +23,7 @@ uint8_t framecount_offset = 0;
 #define FRAMETIME_BUFSIZE 10
 
 uint8_t xoffset = 0;
-uint32_t dot = 0;
+static uint32_t dot = 0;
 
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
@@ -118,7 +120,7 @@ uint16_t interleave(uint16_t a, uint16_t b) {
 }
 
 
-void load_tile(uint8_t* ram, uint16_t tile_data[8], uint8_t tile_id, bool is_object) {
+void load_tile(uint16_t tile_data[8], uint8_t tile_id, bool is_object) {
     /* Read RAM to produce an 8x8 tile (stored in tile_data) */
     uint16_t tile_addr = 0x8000 + (uint16_t)(tile_id)*16;
     if (!(is_object) && tile_id < 128 && !(*(ram+0xFF40)&8)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
@@ -128,7 +130,7 @@ void load_tile(uint8_t* ram, uint16_t tile_data[8], uint8_t tile_id, bool is_obj
 }
 
 
-uint8_t read_objects(uint8_t* ram, ObjectAttribute attrbank[10], uint8_t scanline) {
+uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline) {
     /* builds an array of up to 10 object attributes that intersect with the current scanline */
     uint8_t objects_found = 0;
     uint8_t offset_scanline = scanline + 16;
@@ -158,7 +160,7 @@ uint8_t read_objects(uint8_t* ram, ObjectAttribute attrbank[10], uint8_t scanlin
 }
 
 
-void tick_graphics(uint8_t *ram) {
+bool tick_graphics(void) {
     /* Main tick procedure for graphics */
     uint8_t scanline = dot/456;
     if (dot == 65564) { // enter VBLANK
@@ -168,7 +170,7 @@ void tick_graphics(uint8_t *ram) {
         if (xoffset == 144) xoffset = 0;
         //glutMainLoopEvent();
         //glutPostRedisplay();
-        //print_tilemaps(ram);
+        print_tilemaps();
         end = clock();
         frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
         framecount_offset++;
@@ -177,12 +179,12 @@ void tick_graphics(uint8_t *ram) {
             fprintf(stderr, "framerate: %.2fHz\n", 1.0/(frametime/FRAMETIME_BUFSIZE));
             frametime = 0;
         }
-        fprintf(stderr,"framerate: %.2fHz\n", 1.0/(frametime/10));
+        //fprintf(stderr,"framerate: %.2fHz\n", 1.0/(frametime/10));
         start = clock();
     } else if ((scanline < 144) && (dot % 456) == 0) { // New scanline
         set_render_blocking_mode(2);
         ObjectAttribute objects[10];
-        uint8_t objects_found = read_objects(ram, objects, scanline);
+        uint8_t objects_found = read_objects(objects, scanline);
 
     } else if ((scanline < 144) && (dot % 456) == 80) { // Enter drawing mode
         set_render_blocking_mode(3);
@@ -199,15 +201,17 @@ void tick_graphics(uint8_t *ram) {
     if (dot == 70224) {
         dot = 0;
     }
+    return !dot;
 }
 
 
-void print_tilemaps(uint8_t *ram) {
+void print_tilemaps(void) {
+    printf("FRAME");
     for (int i=0; i<32; i++) {
         uint16_t tiles[32][8];
         char print_palette[4] = {' ', '.', 'o', '0'};
         for (int j=0; j<32; j++) {
-            load_tile(ram, tiles[j], *(ram+0x9800+(i*32)+j), 0);
+            load_tile(tiles[j], *(ram+0x9800+(i*32)+j), 0);
         }
         for (int k=0; k<8; k++) {
             for (int j=0; j<32; j++) {

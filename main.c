@@ -30,21 +30,23 @@ Notes:
 #include <unistd.h>
 
 
-extern bool TIMA_oddity;
-bool tset = 0;
+bool TIMA_oddity = 0; //extern
+uint8_t* ram; //extern
+extern Registers reg;
+extern gbRom rom;
 
-bool service_interrupts(uint8_t* ram, Registers* reg) {
+bool service_interrupts(void) {
     /* Check if an interrupt is due, moving execution if necessary */
-    if ((*reg).IME) { // IME must be set
+    if (reg.IME) { // IME must be set
         uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF);
         for (int isr=0; isr<5; isr++) { //Check for each of the 5 interrupts
             if (available_regs & 1<<isr) {
                 *(ram+0xFF0F) &= ~(uint8_t)(1<<isr); //disable IF
-                set_ime(reg, 0); //disable isr flag
-                set_isr_enable(ram, isr, 0);
-                (*reg).SP-=2; //execute a CALL (push PC to stack)
-                write_word(ram, (*reg).SP, (*reg).PC);
-                set_r16(reg, R16PC, 0x40+(isr<<3)); // go to corresponding isr addr
+                set_ime(0); //disable isr flag
+                set_isr_enable(isr, 0);
+                reg.SP-=2; //execute a CALL (push PC to stack)
+                write_word(reg.SP, reg.PC);
+                set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr addr
                 return 1;
             }
         }
@@ -53,7 +55,7 @@ bool service_interrupts(uint8_t* ram, Registers* reg) {
 }
 
 
-bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
+bool increment_timers(uint16_t machine_ticks) {
     /* Handle the incrementing and overflowing of timers */
     if (!(machine_ticks&0x00FF)) (*(ram+0xFF04))++; //DIV
     uint8_t TAC = *(ram+0xFF07);
@@ -77,7 +79,6 @@ bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
         }
         //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
         if (trigger && !*(ram+0xFF05)) { //TIMA overflows
-            tset = 1;
             do_interrupt = 1;
         }
     }
@@ -87,25 +88,28 @@ bool increment_timers(uint8_t* ram, uint16_t machine_ticks) {
 
 int main(int argc, char *argv[]) {
     init_graphics(&argc, argv);
-    gbRom rom = load_rom(argv[1]);
-    uint8_t *ram = init_ram(&rom);
-    Registers reg = init_registers();
+    load_rom(argv[1]);
+    init_ram();
+    init_registers();
     InstructionResult instruction_result = {0,0,0,0};
     
     bool do_ei = 0;
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     int16_t machine_timeout = 0;
     uint16_t machine_ticks = 0;
+    uint64_t frames = 0;
 
-    //print_registers(&reg);
+    //print_registers();
     uint16_t count = 0;
     while (1) {
         machine_ticks++;
-        if (!machine_ticks) count += 1;
-        if (count == 256) break;
+        if (machine_ticks == 0) count += 1;
+        // if (count == (15)) break; // 64 cycles is one second
+        if ((count == 1024)) break;
+        //12 frames is enough for Tetris's tilemap to fully load
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
-        if (increment_timers(ram, machine_ticks)) {
+        if (increment_timers(machine_ticks)) {
             if (TIMA_oddity) {
                 TIMA_oddity = 0;
             } else {
@@ -115,30 +119,29 @@ int main(int argc, char *argv[]) {
         }
 
             if (!machine_timeout) {
-                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d TIME:%d HALTMODE:%d INTFLAGS:%.2x",
-                get_r8(&reg, ram, R8A),get_r8(&reg, ram, R8F),get_r8(&reg, ram, R8B),get_r8(&reg, ram, R8C),
-                get_r8(&reg, ram, R8D),get_r8(&reg, ram, R8E),get_r8(&reg, ram, R8H),get_r8(&reg, ram, R8L),
-                get_r16(&reg, R16SP),get_r16(&reg, R16PC),
-                *(ram+get_r16(&reg, R16PC)),*(ram+get_r16(&reg, R16PC)+1),*(ram+get_r16(&reg, R16PC)+2),*(ram+get_r16(&reg, R16PC)+3),
-                reg.IME, tset, halt_state, *(ram+0xFF0F)
+                printf("A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x",
+                get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
+                get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
+                get_r16(R16SP),get_r16(R16PC),
+                *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
+                reg.IME, halt_state, *(ram+0xFF0F)
             );
-            tset = 0;
 
             if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
                 halt_state = 0;
             } else {
-                if (service_interrupts(ram, &reg)) {
+                if (service_interrupts()) {
                     halt_state = 0; // clear halt state
                     machine_timeout += 20;
                     //printf("ISR\n");
                 }
             }
             if (halt_state == 0 || halt_state == 3) {
-                instruction_result = run_instruction(ram, &reg);
+                instruction_result = run_instruction(ram);
 
-                //if (halt_state == 2) {instruction_result.new_pc = get_r16(&reg, R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
+                //if (halt_state == 2) {instruction_result.new_pc = get_r16(R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
                 if (halt_state == 3) halt_state = 0;
-                if (do_ei) set_ime(&reg, 1); // set EI late
+                if (do_ei) set_ime(1); // set EI late
 
                 if (instruction_result.halt) { // HALT was called:
                     if (reg.IME) {
@@ -152,14 +155,20 @@ int main(int argc, char *argv[]) {
                 do_ei = instruction_result.eiset;
                 machine_timeout += instruction_result.machine_cycles*4;
                 reg.PC = instruction_result.new_pc;
-                //print_registers(&reg);
+                //print_registers();
             }
         } else {
             machine_timeout -= 1;
         }
-        //tick_graphics(ram);
+        //frames += tick_graphics();
         //usleep(10);
     }
+    fprintf(stderr,"Processed %ld frames.\n", frames);
+
+    //free mallocs
+    free(rom.rom);
+    free(rom.ram);
+    free(ram);
 
     return 0;
 }

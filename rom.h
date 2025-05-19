@@ -24,13 +24,13 @@ typedef struct {
     uint8_t version;
 } gbRom;
 
-gbRom init_rom(FILE* romfile);
-void print_header(gbRom header);
+void init_rom(FILE* romfile);
+void print_header(void);
 void print_error(char errormsg[]);
 int decode_rom_size(uint8_t romcode);
 int decode_ram_size(uint8_t ramcode);
-gbRom load_rom(char filename[]);
-uint8_t* init_ram(gbRom *rom);
-void mbank_register(uint8_t* ram, uint8_t mbc_reg, uint8_t value);
+void load_rom(char filename[]);
+void init_ram(void);
+void mbank_register(uint8_t mbc_reg, uint8_t value);
 
 #endif // ROM_H

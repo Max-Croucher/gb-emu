@@ -10,7 +10,8 @@
 #include <string.h>
 #include "rom.h"
 
-static gbRom rom_container;
+gbRom rom; //extern
+extern uint8_t* ram;
 
 void print_error(char errormsg[]) {
     /* print an error message and exit */
@@ -19,18 +20,18 @@ void print_error(char errormsg[]) {
 }
 
 
-void print_header(gbRom rom_container) {
+void print_header() {
     /* print the contents of a gameboy header */
     fprintf(stderr,"Header contents:\n");
-    fprintf(stderr,"Title:          %s\n", rom_container.title);
-    fprintf(stderr,"Licensee (new): %d\n", rom_container.new_licensee);
-    fprintf(stderr,"Super Gameboy:  %d\n", rom_container.sgbflag);
-    fprintf(stderr,"Cartrige Type:  %d\n", rom_container.carttype);
-    fprintf(stderr,"ROM Size Code:  %d\n", rom_container.romsize);
-    fprintf(stderr,"RAM Size Code:  %d\n", rom_container.ramsize);
-    fprintf(stderr,"Global Release: %d\n", rom_container.locale);
-    fprintf(stderr,"Licensee (old): %d\n", rom_container.old_licensee);
-    fprintf(stderr,"Version:        %d\n", rom_container.version);
+    fprintf(stderr,"Title:          %s\n", rom.title);
+    fprintf(stderr,"Licensee (new): %d\n", rom.new_licensee);
+    fprintf(stderr,"Super Gameboy:  %d\n", rom.sgbflag);
+    fprintf(stderr,"Cartrige Type:  %d\n", rom.carttype);
+    fprintf(stderr,"ROM Size Code:  %d\n", rom.romsize);
+    fprintf(stderr,"RAM Size Code:  %d\n", rom.ramsize);
+    fprintf(stderr,"Global Release: %d\n", rom.locale);
+    fprintf(stderr,"Licensee (old): %d\n", rom.old_licensee);
+    fprintf(stderr,"Version:        %d\n", rom.version);
 }
 
 
@@ -64,36 +65,36 @@ int decode_ram_size(uint8_t ramcode) {
 }
 
 
-gbRom init_rom(FILE* romfile) {
+void init_rom(FILE* romfile) {
     /* read a gameboy rom to process the header and load the rom contents into memory */
     int read_errors = 0;
     fseek(romfile, HEADER_START, SEEK_SET);
-    read_errors += 16!=fread(&rom_container.title, 1, 16, romfile);
-    read_errors += 1!=fread(&rom_container.new_licensee, 2, 1, romfile);
+    read_errors += 16!=fread(&rom.title, 1, 16, romfile);
+    read_errors += 1!=fread(&rom.new_licensee, 2, 1, romfile);
 
     uint8_t sgbflag;
     read_errors += 1!=fread(&sgbflag, 1, 1, romfile);
-    rom_container.sgbflag = sgbflag==0x03;
+    rom.sgbflag = sgbflag==0x03;
 
-    read_errors += 1!=fread(&rom_container.carttype, 1, 1, romfile);
+    read_errors += 1!=fread(&rom.carttype, 1, 1, romfile);
 
     uint8_t romcode;
     uint8_t ramcode;
     read_errors += 1!=fread(&romcode, 1, 1, romfile);
     read_errors += 1!=fread(&ramcode, 1, 1, romfile);
-    rom_container.romsize = decode_rom_size(romcode);
-    rom_container.ramsize = decode_ram_size(ramcode);
+    rom.romsize = decode_rom_size(romcode);
+    rom.ramsize = decode_ram_size(ramcode);
 
-    rom_container.rom = malloc(rom_container.romsize);
-    if (rom_container.ramsize) {
-        rom_container.ram = malloc(rom_container.ramsize);
+    rom.rom = malloc(rom.romsize);
+    if (rom.ramsize) {
+        rom.ram = malloc(rom.ramsize);
     } else {
-        rom_container.ram = 0;
+        rom.ram = 0;
     }
 
-    read_errors += 1!=fread(&rom_container.locale, 1, 1, romfile);
-    read_errors += 1!=fread(&rom_container.old_licensee, 1, 1, romfile);
-    read_errors += 1!=fread(&rom_container.version, 1, 1, romfile);
+    read_errors += 1!=fread(&rom.locale, 1, 1, romfile);
+    read_errors += 1!=fread(&rom.old_licensee, 1, 1, romfile);
+    read_errors += 1!=fread(&rom.version, 1, 1, romfile);
     uint8_t checksum;
     read_errors += 1!=fread(&checksum, 1, 1, romfile);
     if (read_errors) print_error("Unable to read header: EOF.");
@@ -107,12 +108,11 @@ gbRom init_rom(FILE* romfile) {
     }
     if (checksum) print_error("Header Checksum is invalid!");
 
-    print_header(rom_container);
-    return rom_container;
+    print_header();
 }
 
 
-gbRom load_rom(char filename[]) {
+void load_rom(char filename[]) {
 	/* Read a rom file and load contents */
     fprintf(stderr,"Attempting to load rom file %s\n", filename);
 	FILE *romfile;
@@ -121,41 +121,38 @@ gbRom load_rom(char filename[]) {
 		print_error("File is empty.");
 	}
 	
-    gbRom rom_container = init_rom(romfile);
+    init_rom(romfile);
 
         //load rom into memory
     fseek(romfile, 0, SEEK_SET);
-    int bytes_read = fread(rom_container.rom, 1, rom_container.romsize, romfile);
-    if (bytes_read != rom_container.romsize) print_error("Unable to load rom file.");
+    int bytes_read = fread(rom.rom, 1, rom.romsize, romfile);
+    if (bytes_read != rom.romsize) print_error("Unable to load rom file.");
 
     fprintf(stderr,"Successfully loaded rom file.\n");
 
 	fclose(romfile);
-    return rom_container;
 }
 
 
-uint8_t* init_ram(gbRom *rom) {
+void init_ram() {
     /* Initialise the gameboy RAM, loading the first 32K of rom at 0x0000 */
-    uint8_t *ram = malloc(0x10000);
-    memcpy(ram, (*rom).rom, 0x8000);
+    ram = malloc(0x10000);
+    memcpy(ram, rom.rom, 0x8000);
 
     //various ram addrs
     *(ram+0xFF44) = 0x90;
-
-    return ram;
 }
 
 
-void mbank_register(uint8_t* ram, uint8_t mbc_reg, uint8_t value) {
+void mbank_register(uint8_t mbc_reg, uint8_t value) {
     /* Handle writing to an mbank register */
-    if (rom_container.carttype == 1) {
+    if (rom.carttype == 1) {
         if (mbc_reg = 1) {
             value &= 0x1F;
             if (value == 0) value += 1;
-            uint8_t num_banks = rom_container.romsize>>15;
+            uint8_t num_banks = rom.romsize>>15;
             uint8_t bank_id = value&(num_banks-1);
-            memcpy(ram+0x4000, rom_container.rom+(bank_id*0x4000), 0x4000);
+            memcpy(ram+0x4000, rom.rom+(bank_id*0x4000), 0x4000);
         }
     }
 }

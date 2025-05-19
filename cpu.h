@@ -58,22 +58,22 @@ typedef struct {
 #define ISR_SERIAL 3
 #define ISR_JOYPAD 4
 
-Registers init_registers(void);
-void print_registers(Registers *reg);
-bool get_flag(Registers *reg, uint8_t flagname);
-void set_flag(Registers *reg, uint8_t flagname, bool state);
-uint8_t get_r8(Registers *reg, uint8_t* ram, uint8_t regname);
-void set_r8(Registers *reg, uint8_t* ram, uint8_t regname, uint8_t value);
-uint16_t get_r16(Registers *reg, uint16_t regname);
-void set_r16(Registers *reg, uint16_t regname, uint16_t value);
-bool is_cc(Registers *reg, uint8_t cond);
-void set_ime(Registers *reg, bool state);
-void set_isr_enable(uint8_t *ram, uint8_t isr_type, bool state);
-void write_byte(uint8_t *ram, uint16_t addr, uint8_t byte);
-uint8_t read_byte(uint8_t *ram, uint16_t addr);
-void write_word(uint8_t *ram, uint16_t addr, uint16_t word);
-uint16_t read_word(uint8_t *ram, uint16_t addr);
-void joypad_io(uint8_t* ram) ;
+void init_registers(void);
+void print_registers();
+bool get_flag(uint8_t flagname);
+void set_flag(uint8_t flagname, bool state);
+uint8_t get_r8(uint8_t regname);
+void set_r8(uint8_t regname, uint8_t value);
+uint16_t get_r16(uint16_t regname);
+void set_r16(uint16_t regname, uint16_t value);
+bool is_cc(uint8_t cond);
+void set_ime(bool state);
+void set_isr_enable(uint8_t isr_type, bool state);
+void write_byte(uint16_t addr, uint8_t byte);
+uint8_t read_byte(uint16_t addr);
+void write_word(uint16_t addr, uint16_t word);
+uint16_t read_word(uint16_t addr);
+void joypad_io(void) ;
 void set_render_blocking_mode(uint8_t mode);
 
 #endif // CPU_H
