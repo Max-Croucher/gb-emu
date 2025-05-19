@@ -98,6 +98,7 @@ void init_graphics(int *argc, char *argv[]) {
     glutDisplayFunc(gl_tick);
     glutReshapeFunc(reshape_window);
     start = clock();
+    set_render_blocking_mode(0);
     //glutMainLoop();
 }
 
@@ -120,12 +121,19 @@ uint16_t interleave(uint16_t a, uint16_t b) {
 }
 
 
-void load_tile(uint16_t tile_data[8], uint8_t tile_id, bool is_object) {
+uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
+    /* get the memory address of a tile from the tile id and the addressing mode register */
+    uint16_t tile_addr = 0x8000 + ((uint16_t)(tile_id))*16;
+    if (!(is_object) && tile_id < 128 && (*(ram+0xFF40)&8)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
+    return tile_addr;
+}
+
+
+void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
     /* Read RAM to produce an 8x8 tile (stored in tile_data) */
-    uint16_t tile_addr = 0x8000 + (uint16_t)(tile_id)*16;
-    if (!(is_object) && tile_id < 128 && !(*(ram+0xFF40)&8)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
+    
     for (int i=0; i<8; i++) {
-        tile_data[i] = interleave(*(ram+tile_addr+(2*i)), *(ram+tile_addr+(2*i+1)));
+        tile_data[i] = interleave(*(ram+tile_addr+(2*i)), *(ram+tile_addr+(2*i)+1));
     }
 }
 
@@ -160,9 +168,26 @@ uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline) {
 }
 
 
+void draw_background(uint8_t scanline) {
+    /* Draw the background layer on the current scanline */
+}
+
+
+void draw_window(uint8_t scanline) {
+    /* Draw the window layer on the current scanline */
+}
+
+
+void draw_objects(uint8_t scanline, ObjectAttribute objects[10], uint8_t objects_found) {
+    /* Draw the object layer on the current scanline */
+}
+
+
 bool tick_graphics(void) {
     /* Main tick procedure for graphics */
     uint8_t scanline = dot/456;
+    ObjectAttribute objects[10];
+    uint8_t objects_found = 0;
     if (dot == 65564) { // enter VBLANK
         set_render_blocking_mode(1);
         *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
@@ -183,19 +208,17 @@ bool tick_graphics(void) {
         start = clock();
     } else if ((scanline < 144) && (dot % 456) == 0) { // New scanline
         set_render_blocking_mode(2);
-        ObjectAttribute objects[10];
-        uint8_t objects_found = read_objects(objects, scanline);
+        objects_found = read_objects(objects, scanline);
 
     } else if ((scanline < 144) && (dot % 456) == 80) { // Enter drawing mode
         set_render_blocking_mode(3);
+        draw_background(scanline);
+        draw_window(scanline);
+        draw_objects(scanline, objects, objects_found);
 
-    } else if ((scanline < 144) && (dot % 456) == 252) { // Enter Hblank
+    } else if ((scanline < 144) && (dot % 456) == 232) { // Enter Hblank
         set_render_blocking_mode(0);
     }
-
-
-
-
 
     dot++;
     if (dot == 70224) {
@@ -206,15 +229,16 @@ bool tick_graphics(void) {
 
 
 void print_tilemaps(void) {
-    printf("FRAME");
+    printf("FRAME\n");
+    char print_palette[4] = {' ', '.', 'o', '0'};
     for (int i=0; i<32; i++) {
-        uint16_t tiles[32][8];
-        char print_palette[4] = {' ', '.', 'o', '0'};
-        for (int j=0; j<32; j++) {
-            load_tile(tiles[j], *(ram+0x9800+(i*32)+j), 0);
+        uint16_t tiles[16][8];
+        for (int j=0; j<16; j++) {
+            //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
+            load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
         }
         for (int k=0; k<8; k++) {
-            for (int j=0; j<32; j++) {
+            for (int j=0; j<16; j++) {
                 for (int l=7; l>=0; l--){
                     printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
                 }

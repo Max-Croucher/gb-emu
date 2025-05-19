@@ -262,8 +262,8 @@ void write_byte(uint16_t addr, uint8_t byte) {
     }
 
 
-    if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
-    if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
+    //if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
+    //if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
 
     *(ram+addr) = byte; // write if no return

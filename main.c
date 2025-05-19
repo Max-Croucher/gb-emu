@@ -108,8 +108,8 @@ int main(int argc, char *argv[]) {
     while (1) {
         machine_ticks++;
         if (machine_ticks == 0) count += 1;
-        // if (count == (15)) break; // 64 cycles is one second
-        if ((count == 1024)) break;
+        if (count == (15)) break; // 64 cycles is one second
+        //if ((count == 1024)) break;
         //12 frames is enough for Tetris's tilemap to fully load
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
 
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
         } else {
             machine_timeout -= 1;
         }
-        //frames += tick_graphics();
+        frames += tick_graphics();
         //usleep(10);
     }
     fprintf(stderr,"Processed %ld frames.\n", frames);
