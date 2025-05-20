@@ -12,10 +12,9 @@
 #include "cpu.h"
 #include "rom.h"
 
-static int joypad_io_state = 0;
-static JoypadState joypad_state = {0,0,0,0,0,0,0,0};
-uint8_t vblank_mode = 0;
+JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
+bool LOOP = 1; //extern
 extern bool TIMA_oddity;
 extern uint8_t* ram;
 extern gbRom rom;
@@ -241,7 +240,12 @@ void write_byte(uint16_t addr, uint8_t byte) {
     }
     if (addr >= 0xFEA0 && addr < 0xFEFF) return;
 
-    if (addr == 0xFF00) joypad_io(); //writing to this addr queries the joypad
+    if (addr == 0xFF00) { //writing to this addr queries the joypad
+        *(ram+0xFF00) = *(ram+0xFF00)&0xCF;
+        *(ram+0xFF00) |= byte&0x30; // set mask of byte
+        joypad_io();
+        return;
+    }
 
     if (addr == 0xFF04) *(ram+addr) = 0; //writing to DIV sets it to 0
 
@@ -261,9 +265,11 @@ void write_byte(uint16_t addr, uint8_t byte) {
         return;
     }
 
+    if (addr == 0xFF44) return;
+    if (addr == 0xFF41) byte &= 0x74; // only set certain regs
 
-    //if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
-    //if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
+    //if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
+    //if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
 
     *(ram+addr) = byte; // write if no return
@@ -273,8 +279,8 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
-    if ((vblank_mode == 2 || vblank_mode == 3) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
-    if ((vblank_mode == 3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
+    if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
+    if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
     return *(ram+addr);
 }
 
@@ -293,7 +299,7 @@ uint16_t read_word(uint16_t addr) {
 
 
 void joypad_io(void) {
-    switch (joypad_io_state)
+    switch ((*(ram+0xFF00)>>4)&3)
     {
     case 0:
     case 3:
@@ -308,9 +314,4 @@ void joypad_io(void) {
         *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
         break;
     }
-}
-
-void set_render_blocking_mode(uint8_t mode) {
-    /* Set the current rendering mode, to indicate which vram blocks are inaccessible */
-    vblank_mode = mode;
 }

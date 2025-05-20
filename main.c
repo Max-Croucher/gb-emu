@@ -35,6 +35,7 @@ bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
 extern Registers reg;
 extern gbRom rom;
+extern bool LOOP;
 
 
 bool service_interrupts(void) {
@@ -106,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     //print_registers();
     uint16_t count = 0;
-    while (1) {
+    while (LOOP) {
         machine_ticks++;
         if (machine_ticks == 0) count += 1;
         if (count == (8192)) break; // 64 cycles is one second
@@ -169,6 +170,7 @@ int main(int argc, char *argv[]) {
         frames += tick_graphics();
         //usleep(10);
     }
+    if (!LOOP) fprintf(stderr, "Exiting (keypress).\n");
     fprintf(stderr,"Processed %ld frames.\n", frames);
 
     //write ram contents to a file
