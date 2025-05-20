@@ -36,6 +36,7 @@ uint8_t* ram; //extern
 extern Registers reg;
 extern gbRom rom;
 
+
 bool service_interrupts(void) {
     /* Check if an interrupt is due, moving execution if necessary */
     if (reg.IME) { // IME must be set
@@ -88,10 +89,10 @@ bool increment_timers(uint16_t machine_ticks) {
 
 
 int main(int argc, char *argv[]) {
-    init_graphics(&argc, argv);
     load_rom(argv[1]);
     init_ram();
     init_registers();
+    init_graphics(&argc, argv);
     InstructionResult instruction_result = {0,0,0,0};
     
     FILE *logfile;
@@ -108,7 +109,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         machine_ticks++;
         if (machine_ticks == 0) count += 1;
-        if (count == (15)) break; // 64 cycles is one second
+        if (count == (8192)) break; // 64 cycles is one second
         //if ((count == 1024)) break;
         //12 frames is enough for Tetris's tilemap to fully load
         //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);

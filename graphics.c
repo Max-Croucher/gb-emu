@@ -28,26 +28,9 @@ static uint32_t dot = 0;
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
 
-void init_screen_tex(GLubyte texture[144][160][3]) {
-    // /* initialise the screen texture */
-    // for (int i=0; i<144; i++) {
-    //     float r = (float)((i+xoffset)%144) / 144.0 * 255.0;
-    //     for (int j=0; j<160; j++) {
-    //         float g = (float)j / 160 * 255.0;
-    //         texture[i][j][0] = (GLubyte)r;
-    //         texture[i][j][1] = (GLubyte)g;
-    //         texture[i][j][2] = (GLubyte)0;
-    //     }
-    // }
-    // for (int i=40; i < 60; i++) {
-    //     for (int j=40; j < 60; j++) {
-    //         texture[i][j][0] = (GLubyte)0;
-    //         texture[i][j][1] = (GLubyte)0;
-    //         texture[i][j][2] = (GLubyte)0;
-            
-    //     }
-            
-    // }
+uint8_t pixvals[4] = {0xFF, 0xA0, 0x50, 0x00};
+
+void init_screen_tex(void) {
     glEnable(GL_TEXTURE_2D);
     glTexImage2D(GL_TEXTURE_2D,0,3,160,144,0,GL_RGB, GL_UNSIGNED_BYTE, texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -61,7 +44,7 @@ void gl_tick(void) {
     glClear(GL_COLOR_BUFFER_BIT);
     glPushMatrix();
     //glColor3f(0.0,1.0,0.0);
-    init_screen_tex(texture);
+    init_screen_tex();
     glBegin(GL_POLYGON);
         glTexCoord2f(0,0); glVertex2f(0,0);
         glTexCoord2f(0,1); glVertex2f(0,1);
@@ -186,32 +169,27 @@ void draw_background(uint8_t scanline) {
     char print_palette[4] = {' ', '.', 'o', '0'};
     uint8_t top = scanline + *(ram+0xFF42); //get scroll vals
     uint8_t left = *(ram+0xFF43);
-    uint8_t tileaddrs[21];
-    printf("Scanline %d tiles (T: %d, L: %d): \n", scanline, top, left);
+    uint16_t tiles[21][8];
+    //printf("Scanline %d tiles (T: %d, L: %d): \n", scanline, top, left);
     for (int i=0; i<21; i++) {
         uint8_t tile_id = get_tile_id((left>>3)+i + (top>>3)*32, 0);
 
 
 
-        printf("0x%.2x ", tile_id);
-        tileaddrs[i] = get_tile_addr(tile_id, 0);
+        //printf("0x%.2x ", tile_id);
+        load_tile(tiles[i], get_tile_addr(tile_id, 0));
     }
-    printf("\n");
-
-    uint16_t current_tile[8];
-    uint8_t current_tile_pos = 0;
-    load_tile(current_tile,tileaddrs[left%8]);
+    //printf("\n");
 
     for (int i=0; i<160; i++) {
-        if (((i+left)%8)==0) {
-            current_tile_pos = (i+(left%8))>>3;
-            load_tile(current_tile,tileaddrs[(i+(left%8))>>3]);
-        }
-        uint8_t pix = (current_tile[top%8] >> (2*(((i+left)%8))))&3;
-        printf("%d p=%d (%c) ", (i+left), current_tile_pos, print_palette[pix]);
-        texture[scanline][i][0],texture[scanline][i][1],texture[scanline][i][2] = get_background_pallette(pix);
+        uint8_t pix = (tiles[(i+left)>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
+        //printf("%d p=%d (%c) ", (i+left), (i+left)>>3, print_palette[pix]);
+        //printf("%c", print_palette[get_background_pallette(pix)]);
+        texture[143-scanline][i][0] = pixvals[get_background_pallette(pix)];
+        texture[143-scanline][i][1] = pixvals[get_background_pallette(pix)];
+        texture[143-scanline][i][2] = pixvals[get_background_pallette(pix)];
     }
-    printf("\n");
+    //printf("\n");
 }
 
 
@@ -237,7 +215,7 @@ bool tick_graphics(void) {
         if (xoffset == 144) xoffset = 0;
         glutMainLoopEvent();
         glutPostRedisplay();
-        print_tilemaps();
+        //print_tilemaps();
         end = clock();
         frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
         framecount_offset++;
@@ -303,5 +281,13 @@ void print_tilemaps(void) {
     //         }
     //         printf("\n");
     //     }
+    // }
+
+
+    // for (int i=0; i<144; i++) {
+    //     for (int j=0; j<160; j++) {
+    //         printf("%.2x", texture[i][j][0]);
+    //     }
+    //     printf("\n");
     // }
 }

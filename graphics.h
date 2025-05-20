@@ -17,7 +17,7 @@ typedef struct {
     bool palette;
 } ObjectAttribute;
 
-void init_screen_tex(GLubyte texture[144][160][3]);
+void init_screen_tex(void);
 void gl_tick(void);
 void reshape(int w, int h);
 void init_graphics(int *argc, char *argv[]);
