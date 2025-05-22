@@ -30,7 +30,7 @@ static uint32_t dot = 0;
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
 
-uint8_t pixvals[4] = {0xFF, 0xA0, 0x50, 0x00};
+uint8_t pixvals[5] = {0xF8, 0xA0, 0x50, 0x00, 0xFF};
 
 bool old_stat_state = 0;
 
@@ -89,6 +89,7 @@ void init_graphics(int *argc, char *argv[]) {
     blank_screen();
     glutKeyboardFunc(key_pressed);
     glutKeyboardUpFunc(key_released);
+    glutCloseFunc(window_closed);
     glutMainLoopEvent();
     start = clock();
     *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
@@ -96,7 +97,12 @@ void init_graphics(int *argc, char *argv[]) {
 }
 
 
-void key_pressed (unsigned char key, int x, int y) {
+void window_closed(void) {
+    /* execute when the window is closed */
+    LOOP = 0;
+}
+
+void key_pressed(unsigned char key, int x, int y) {
     /* handle keys being pressed */
     bool has_changed = 1;
     switch (key)
@@ -125,6 +131,7 @@ void key_pressed (unsigned char key, int x, int y) {
     case '\'':
         joypad_state.select = 1;
         break;
+    case 'q':
     case 27:
         LOOP = 0;
         break;
@@ -137,11 +144,10 @@ void key_pressed (unsigned char key, int x, int y) {
         bool old_state = *(ram+0xFF00)&0xF;
         if (old_state > *(ram+0xFF00)&0xF) *(ram+0xFF0F) |= 16; // Request a VBlank interrupt
     }
-
 }
 
 
-void key_released (unsigned char key, int x, int y) {
+void key_released(unsigned char key, int x, int y) {
     /* handle keys being released */
     bool has_changed = 1;
     switch (key)
@@ -181,7 +187,7 @@ void blank_screen(void) {
     /* set the entire screen to black */
     for (int i=0; i<144; i++) {
         for (int j=0; j<160; j++) {
-            texture[i][j][0],texture[i][j][1],texture[i][j][2] = 0;
+            texture[i][j][0]=texture[i][j][1]=texture[i][j][2] = pixvals[4];
         }
     }
 }
@@ -307,31 +313,33 @@ bool tick_graphics(void) {
     /* Main tick procedure for graphics */
 
     if (lcd_enable ^ (*(ram+0xFF40)>>7)) { //lcd state change
-        if (*(ram+0xFF40)>>7) {
+        if (*(ram+0xFF40)>>7) { // LCD was just turned on
             lcd_enable = 1;
-        } else {
+        } else { // LCD was just turned off
+            dot = 0;
             lcd_enable = 0;
+            *(ram+0xFF44) = 0; // reset LYC
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 1; // set ppu mode to 1
             blank_screen();
         }
     }
-    if (!lcd_enable) return 0;
 
     uint8_t scanline = dot/456;
     *(ram+0xFF44) = scanline; // LY
-    *(ram+0xFF41) &= ~4;
-    *(ram+0xFF41) |= (scanline == *(ram+0xFF44))<<2; // set LY=LYC flag
+    *(ram+0xFF41) &= 0xFB;
+    *(ram+0xFF41) |= (scanline == *(ram+0xFF45))<<2; // set LY=LYC flag
 
-    bool stat_type_LYC = *(ram+0xFF41)&4;
-    bool stat_type_mode = 0;
-    if ((*(ram+0xFF41)&3)<3) {
-        stat_type_mode = *(ram+0xFF41) << ((*(ram+0xFF41)&3)+3);
-    }
-    /*************************************************************/
-    //This breaks the blargg cpu instr test somehow. lcd interrupts?
-    // if ((old_stat_state == 0) && (stat_type_LYC||stat_type_mode)) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
-    // old_stat_state == stat_type_LYC||stat_type_mode;
+    bool stat_type_LYC = *(ram+0xFF41)&64;
+
+    bool current_stat_state = (
+        stat_type_LYC ||
+        (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
+        (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
+        (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
+    );
+    if ((old_stat_state == 0) && current_stat_state) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
+    old_stat_state == current_stat_state;
 
     ObjectAttribute objects[10];
     uint8_t objects_found = 0;
@@ -382,37 +390,37 @@ void print_tilemaps(void) {
     printf("FRAME\n");
     char print_palette[4] = {' ', '.', 'o', '0'};
     
-    // for (int i=0; i<32; i++) {
-    //     uint16_t tiles[16][8];
-    //     for (int j=0; j<16; j++) {
-    //         //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
-    //         load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
-    //     }
-    //     for (int k=0; k<8; k++) {
-    //         for (int j=0; j<16; j++) {
-    //             for (int l=7; l>=0; l--){
-    //                 printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
-    //             }
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-
     for (int i=0; i<32; i++) {
-        uint16_t tiles[32][8];
-        for (int j=0; j<32; j++) {
-            printf("%d, %d: %d | %.4x\n", i, j, get_tile_id(j+i*32, 0), get_tile_addr(get_tile_id(j+i*32, 0),0));
-            load_tile(tiles[j], get_tile_addr(get_tile_id(j+i*32, 0),0));
+        uint16_t tiles[16][8];
+        for (int j=0; j<16; j++) {
+            //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
+            load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
         }
         for (int k=0; k<8; k++) {
-            for (int j=0; j<32; j++) {
+            for (int j=0; j<16; j++) {
                 for (int l=7; l>=0; l--){
-                    printf("%c", print_palette[get_background_pallette((tiles[j][k]>>(2*l))&3)]);
+                    printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
                 }
             }
             printf("\n");
         }
     }
+
+    // for (int i=0; i<32; i++) {
+    //     uint16_t tiles[32][8];
+    //     for (int j=0; j<32; j++) {
+    //         printf("%d, %d: %d | %.4x\n", i, j, get_tile_id(j+i*32, 0), get_tile_addr(get_tile_id(j+i*32, 0),0));
+    //         load_tile(tiles[j], get_tile_addr(get_tile_id(j+i*32, 0),0));
+    //     }
+    //     for (int k=0; k<8; k++) {
+    //         for (int j=0; j<32; j++) {
+    //             for (int l=7; l>=0; l--){
+    //                 printf("%c", print_palette[get_background_pallette((tiles[j][k]>>(2*l))&3)]);
+    //             }
+    //         }
+    //         printf("\n");
+    //     }
+    // }
 
 
     // for (int i=0; i<144; i++) {

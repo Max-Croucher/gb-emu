@@ -21,6 +21,7 @@ void init_screen_tex(void);
 void gl_tick(void);
 void reshape(int w, int h);
 void init_graphics(int *argc, char *argv[]);
+void window_closed(void);
 void key_pressed (unsigned char key, int x, int y);
 void key_released (unsigned char key, int x, int y);
 void blank_screen(void);

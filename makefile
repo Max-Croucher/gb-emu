@@ -5,7 +5,7 @@ all: gbemu
 
 main.o: main.c cpu.h rom.h opcodes.h graphics.h mnemonics.h
 	$(CC) -c $(CFLAGS) $< -o $@
-cpu.o: cpu.c cpu.h rom.h
+cpu.o: cpu.c cpu.h rom.h registers.h
 	$(CC) -c $(CFLAGS) $< -o $@
 opcodes.o: opcodes.c opcodes.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@

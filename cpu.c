@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include "cpu.h"
 #include "rom.h"
+#include "registers.h"
 
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
@@ -240,15 +241,16 @@ void write_byte(uint16_t addr, uint8_t byte) {
     }
     if (addr >= 0xFEA0 && addr < 0xFEFF) return;
 
+
+
+
     if (addr == 0xFF00) { //writing to this addr queries the joypad
         *(ram+0xFF00) = *(ram+0xFF00)&0xCF;
         *(ram+0xFF00) |= byte&0x30; // set mask of byte
         joypad_io();
         return;
     }
-
     if (addr == 0xFF04) *(ram+addr) = 0; //writing to DIV sets it to 0
-
     //strange TIMA behaviour
     if (addr == 0xFF05) { //TIMA 
         if (!*(ram+addr)) {
@@ -258,22 +260,24 @@ void write_byte(uint16_t addr, uint8_t byte) {
         }
         if (*(ram+0xFF05) == *(ram+0xFF06)) return;
     }
-
     if (addr == 0xFF06 && (*(ram+0xFF05) == *(ram+0xFF06))) {//writing to TMA on overflow: write to both
         *(ram+0xFF05) = byte;
         *(ram+0xFF06) = byte;
         return;
     }
-
     if (addr == 0xFF44) return;
     if (addr == 0xFF41) byte &= 0x74; // only set certain regs
 
     //if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
     //if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
+    // if (addr > 0xFF00) { //Special instructions
+    //     uint8_t mask = write_masks[addr&0xFF];
+    //     *(ram+addr) &= ~mask; // set to-be-written bits low
+    //     *(ram+addr) |= byte&mask; // write only the masked bits
+    // }
 
-    *(ram+addr) = byte; // write if no return
-
+    *(ram+addr) = byte; // write if nothing else happens
 }
 
 
@@ -281,6 +285,12 @@ uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
     if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
+
+    // if (addr > 0xFF00) { //Special instructions
+    //     return *(ram+addr) | (write_masks[addr&0xFF]); // set unreadable bits high
+    // }
+
+
     return *(ram+addr);
 }
 

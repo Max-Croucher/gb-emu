@@ -123,7 +123,23 @@ InstructionResult block00(uint8_t opcode) {
         break;
     case 0b00010000: //STOP
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,0};
-        fprintf(stderr, "WARNING: STOP is not implemented!\n");
+
+        if (*(ram+0xFF00)&0x0F) { //button is being held
+            if (*(ram+0xFF0F)&*(ram+0xFFFF)) { // interrupt is pending
+                instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,2}; // stop is 1-byte, no HALT, no DIV reset
+            } else {
+                instruction_result = (InstructionResult){0,1,get_r16(R16PC)+2,2}; // stop is 2-byte, HALT mode, no DIV reset
+            }
+        } else {
+            if (*(ram+0xFF0F)&*(ram+0xFFFF)) {
+                instruction_result = (InstructionResult){0,2,get_r16(R16PC)+1,2}; // stop is 1-byte, STOP mode, DIV reset
+                *(ram+0xFF04) = 0;
+            } else {
+                instruction_result = (InstructionResult){0,2,get_r16(R16PC)+2,2}; // stop is 2-byte, STOP mode, DIV reset
+                *(ram+0xFF04) = 0;
+            }
+        }
+        fprintf(stderr, "WARNING: should STOP be encountered?\n");
         break;
     default:
         has_finished = 0;

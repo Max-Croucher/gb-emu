@@ -9,7 +9,7 @@
 
 typedef struct
 {
-    bool halt;
+    uint8_t haltmode;
     bool eiset;
     uint16_t new_pc;
     uint8_t machine_cycles;
