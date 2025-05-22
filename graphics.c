@@ -236,10 +236,10 @@ void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
 }
 
 
-uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline) {
+uint8_t read_objects(ObjectAttribute attrbank[10]) {
     /* builds an array of up to 10 object attributes that intersect with the current scanline */
     uint8_t objects_found = 0;
-    uint8_t offset_scanline = scanline + 16;
+    uint8_t offset_scanline = *(ram+0xFF44) + 16;
     bool tile8x8 = *(ram+0xFF40) & (1<<2); //1 if 8x8, 0 if 8x16
     for (int i=0; i<40; i++) {
         if (objects_found == 10) break;
@@ -270,41 +270,38 @@ uint8_t get_background_pallette(uint8_t pallette_id) {
     return (*(ram+0xFF47) >> (2*pallette_id))&3;
 }
 
-void draw_background(uint8_t scanline) {
+void draw_background() {
     /* Draw the background layer on the current scanline */
-    char print_palette[4] = {' ', '.', 'o', '0'};
-    uint8_t top = scanline + *(ram+0xFF42); //get scroll vals
+    if (*(ram+0xFF40)&1 == 0) { //bg is disabled
+        for (int i=0; i<160; i++) {
+            texture[143-*(ram+0xFF44)][i][0] = pixvals[0];
+            texture[143-*(ram+0xFF44)][i][1] = pixvals[0];
+            texture[143-*(ram+0xFF44)][i][2] = pixvals[0];
+        }
+        return;
+    }
+    uint8_t top = *(ram+0xFF44) + *(ram+0xFF42); //get scroll vals
     uint8_t left = *(ram+0xFF43);
     uint16_t tiles[21][8];
-    //printf("Scanline %d tiles (T: %d, L: %d): \n", scanline, top, left);
     for (int i=0; i<21; i++) {
         uint8_t tile_id = get_tile_id((left>>3)+i + (top>>3)*32, 0);
-
-
-
-        //printf("0x%.2x ", tile_id);
         load_tile(tiles[i], get_tile_addr(tile_id, 0));
     }
-    //printf("\n");
-
     for (int i=0; i<160; i++) {
         uint8_t pix = (tiles[(i+left)>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
-        //printf("%d p=%d (%c) ", (i+left), (i+left)>>3, print_palette[pix]);
-        //printf("%c", print_palette[get_background_pallette(pix)]);
-        texture[143-scanline][i][0] = pixvals[get_background_pallette(pix)];
-        texture[143-scanline][i][1] = pixvals[get_background_pallette(pix)];
-        texture[143-scanline][i][2] = pixvals[get_background_pallette(pix)];
+        texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_pallette(pix)];
+        texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_pallette(pix)];
+        texture[143-*(ram+0xFF44)][i][2] = pixvals[get_background_pallette(pix)];
     }
-    //printf("\n");
 }
 
 
-void draw_window(uint8_t scanline) {
+void draw_window() {
     /* Draw the window layer on the current scanline */
 }
 
 
-void draw_objects(uint8_t scanline, ObjectAttribute objects[10], uint8_t objects_found) {
+void draw_objects(ObjectAttribute objects[10], uint8_t objects_found) {
     /* Draw the object layer on the current scanline */
 }
 
@@ -318,20 +315,16 @@ bool tick_graphics(void) {
         } else { // LCD was just turned off
             dot = 0;
             lcd_enable = 0;
-            *(ram+0xFF44) = 0; // reset LYC
             *(ram+0xFF41) &= 0xFC;
-            *(ram+0xFF41) += 1; // set ppu mode to 1
+            *(ram+0xFF41) += 0; // set ppu mode to 0
             blank_screen();
         }
     }
-
-    uint8_t scanline = dot/456;
-    *(ram+0xFF44) = scanline; // LY
+    *(ram+0xFF44) = (dot/456); // LY (scanline)
     *(ram+0xFF41) &= 0xFB;
-    *(ram+0xFF41) |= (scanline == *(ram+0xFF45))<<2; // set LY=LYC flag
+    *(ram+0xFF41) |= (*(ram+0xFF44) == *(ram+0xFF45))<<2; // set LY=LYC flag
 
     bool stat_type_LYC = *(ram+0xFF41)&64;
-
     bool current_stat_state = (
         stat_type_LYC ||
         (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
@@ -341,48 +334,52 @@ bool tick_graphics(void) {
     if ((old_stat_state == 0) && current_stat_state) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
     old_stat_state == current_stat_state;
 
-    ObjectAttribute objects[10];
-    uint8_t objects_found = 0;
-    if (dot == 65564) { // enter VBLANK
-        *(ram+0xFF41) &= 0xFC;
-        *(ram+0xFF41) += 1; // set ppu mode to 1
-        *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
-        xoffset++;
-        if (xoffset == 144) xoffset = 0;
-        glutMainLoopEvent();
-        glutPostRedisplay();
-        //print_tilemaps();
-        end = clock();
-        frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
-        framecount_offset++;
-        if (framecount_offset == (FRAMETIME_BUFSIZE-1)) {
-            framecount_offset = 0;
-            fprintf(stderr, "framerate: %.2fHz\n", 1.0/(frametime/FRAMETIME_BUFSIZE));
-            frametime = 0;
+    if (lcd_enable) {
+        ObjectAttribute objects[10];
+        uint8_t objects_found = 0;
+        if (dot == 65564) { // enter VBLANK
+            *(ram+0xFF41) &= 0xFC;
+            *(ram+0xFF41) += 1; // set ppu mode to 1
+            *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
+            xoffset++;
+            if (xoffset == 144) xoffset = 0;
+            glutMainLoopEvent();
+            glutPostRedisplay();
+            //print_tilemaps();
+            end = clock();
+            frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
+            framecount_offset++;
+            if (framecount_offset == (FRAMETIME_BUFSIZE-1)) {
+                framecount_offset = 0;
+                fprintf(stderr, "framerate: %.2fHz\n", 1.0/(frametime/FRAMETIME_BUFSIZE));
+                frametime = 0;
+            }
+            //fprintf(stderr,"framerate: %.2fHz\n", 1.0/(frametime/10));
+            start = clock();
+        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
+            *(ram+0xFF41) &= 0xFC;
+            *(ram+0xFF41) += 2; // set ppu mode to 2
+            objects_found = read_objects(objects);
+
+        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
+            *(ram+0xFF41) &= 0xFC;
+            *(ram+0xFF41) += 3; // set ppu mode to 3
+            draw_background();
+            draw_window();
+            draw_objects(objects, objects_found);
+
+        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 232) { // Enter Hblank
+            *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
         }
-        //fprintf(stderr,"framerate: %.2fHz\n", 1.0/(frametime/10));
-        start = clock();
-    } else if ((scanline < 144) && (dot % 456) == 0) { // New scanline
-        *(ram+0xFF41) &= 0xFC;
-        *(ram+0xFF41) += 2; // set ppu mode to 2
-        objects_found = read_objects(objects, scanline);
 
-    } else if ((scanline < 144) && (dot % 456) == 80) { // Enter drawing mode
-        *(ram+0xFF41) &= 0xFC;
-        *(ram+0xFF41) += 3; // set ppu mode to 3
-        draw_background(scanline);
-        draw_window(scanline);
-        draw_objects(scanline, objects, objects_found);
-
-    } else if ((scanline < 144) && (dot % 456) == 232) { // Enter Hblank
-        *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
+        dot++;
+        if (dot == 70224) {
+            dot = 0;
+        }
+        return !dot;
+    } else {
+        return 0;
     }
-
-    dot++;
-    if (dot == 70224) {
-        dot = 0;
-    }
-    return !dot;
 }
 
 

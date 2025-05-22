@@ -8,10 +8,16 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 #include "rom.h"
 
 gbRom rom; //extern
 extern uint8_t* ram;
+
+uint8_t rom_banking_high_bits = 0;
+bool banking_mode_select = 0;
+bool ext_ram_offset = 0;
+bool ext_ram_enable = 0;
 
 void print_error(char errormsg[]) {
     /* print an error message and exit */
@@ -165,15 +171,51 @@ void init_ram() {
     // memcpy(ram+0xFF00, &initial_registers, 128);
 }
 
-void mbank_register(uint8_t mbc_reg, uint8_t value) {
+void mbank_register(uint16_t addr, uint8_t byte) {
     /* Handle writing to an mbank register */
-    if (rom.carttype == 1) {
-        if (mbc_reg = 1) {
-            value &= 0x1F;
-            if (value == 0) value += 1;
-            uint8_t num_banks = rom.romsize>>15;
-            uint8_t bank_id = value&(num_banks-1);
+    //fprintf(stderr, "Received write with address 0x%.4x and value 0x%.2x\n", addr, byte);
+    switch (rom.carttype)
+    {
+    case 0: // no MBC
+        break;
+    case 1:
+    case 2:
+    case 3: //MBC1
+        if (addr < 0x2000) { // RAM enable
+            ext_ram_enable = (byte == 0xA);
+            //fprintf(stderr, "RAM enable set to %s.\n", (byte == 0xA) ? "ON" : "OFF");
+        } else if (addr < 0x4000) { // ROM bank switch
+            byte &= 0x1F;
+            if (byte == 0) byte += 1;
+            uint8_t num_banks = rom.romsize>>14;
+            uint8_t bank_id = byte&(num_banks-1);
+            if (banking_mode_select) bank_id += rom_banking_high_bits << 5;
+            //fprintf(stderr, "Switching ROM bank to %d\n", bank_id);
             memcpy(ram+0x4000, rom.rom+(bank_id*0x4000), 0x4000);
+
+        } else if (addr < 0x6000) { // RAM bank switch and upper bits of ROM bank
+            rom_banking_high_bits = byte&3;
+        } else { // ROM banking mode select
+            banking_mode_select = byte&1;
         }
+        break;
+    default:
+        print_error("MBANK type is not recognised or not supported!");
     }
+}
+
+void write_ext_ram(uint16_t addr, uint8_t byte) {
+    /* Write to external cartridge RAM */
+    if (!ext_ram_enable) {
+        return;
+    }
+    *(rom.ram + ext_ram_offset + addr) = byte;
+}
+
+uint8_t read_ext_ram(uint16_t addr) {
+    /* Read to external cartridge RAM */
+    if (!ext_ram_enable) {
+        return 0xFF;
+    }
+    return *(rom.ram + ext_ram_offset + addr);
 }

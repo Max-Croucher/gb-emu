@@ -29,11 +29,11 @@ uint16_t interleave(uint16_t a, uint16_t b);
 uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer);
 uint16_t get_tile_addr(uint8_t tile_id, bool is_object);
 void load_tile(uint16_t tile_data[8], uint16_t tile_addr);
-uint8_t read_objects(ObjectAttribute attrbank[10], uint8_t scanline);
+uint8_t read_objects(ObjectAttribute attrbank[10]);
 uint8_t get_background_pallette(uint8_t pallette_id);
-void draw_background(uint8_t scanline);
-void draw_window(uint8_t scanline);
-void draw_objects(uint8_t scanline, ObjectAttribute objects[10], uint8_t objects_found);
+void draw_background();
+void draw_window();
+void draw_objects(ObjectAttribute objects[10], uint8_t objects_found);
 bool tick_graphics(void);
 void print_tilemaps(void);
 

@@ -224,17 +224,15 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
     if (addr < 0x8000) { //mbc registers
-        if (addr < 0x2000) {
-            mbank_register(0, byte);
-        } else if (addr < 0x4000) {
-            mbank_register(1, byte);
-        } else if (addr < 0x6000) {
-            mbank_register(2, byte);
-        }  else {
-            mbank_register(3, byte);
-        }
+        mbank_register(addr, byte);
         return;
     }
+
+    if (addr >= 0xA000 && addr < 0xC000) { //Writing to external RAM
+        write_ext_ram(addr-0xA000, byte);
+        return;
+    }
+
     if (addr >= 0xE000 && addr < 0xFE00) {
         write_byte(addr-0x2000, byte); //Echo RAM
         return;
@@ -266,10 +264,14 @@ void write_byte(uint16_t addr, uint8_t byte) {
         return;
     }
     if (addr == 0xFF44) return;
-    if (addr == 0xFF41) byte &= 0x74; // only set certain regs
+    if (addr == 0xFF41) {
+        *(ram+addr) &= 0x87;
+        *(ram+addr) += byte & 0x78; // only set certain regs
+        return;
+    }
 
-    //if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
-    //if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
+    // if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
+    // if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
     // if (addr > 0xFF00) { //Special instructions
     //     uint8_t mask = write_masks[addr&0xFF];
@@ -283,6 +285,11 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
+
+    if (addr >= 0xA000 && addr < 0xC000) { // Reading from external RAM
+        return read_ext_ram(addr-0xA000);
+    }
+
     if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
 
