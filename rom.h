@@ -31,11 +31,28 @@ int decode_rom_size(uint8_t romcode);
 int decode_ram_size(uint8_t ramcode);
 void load_rom(char filename[]);
 void init_ram(void);
-void mbank_register(uint16_t mbc_reg, uint8_t byte);
-void write_ext_ram(uint16_t addr, uint8_t byte);
-uint8_t read_ext_ram(uint16_t addr);
-uint8_t read_rom(uint32_t addr);
+// void write_MBANK_register(uint16_t mbc_reg, uint8_t byte);
+// uint8_t read_rom(uint32_t addr);
+// void write_ext_ram(uint16_t addr, uint8_t byte);
+// uint8_t read_ext_ram(uint16_t addr);
 void detect_multicart(void);
+void initialise_rom_address_functions(void);
 
+//MBANK i/o functions
+static void _NO_MBC_write_MBANK_register(uint16_t mbc_reg, uint8_t byte);
+static uint8_t _NO_MBC_read_rom(uint32_t addr);
+static void _NO_MBC_write_ext_ram(uint16_t addr, uint8_t byte);
+static uint8_t _NO_MBC_read_ext_ram(uint16_t addr);
+
+static void _MBC1_write_MBANK_register(uint16_t mbc_reg, uint8_t byte);
+static uint8_t _MBC1_read_rom(uint32_t addr);
+static uint8_t _MBC1_MULTICART_read_rom(uint32_t addr);
+static void _MBC1_write_ext_ram(uint16_t addr, uint8_t byte);
+static uint8_t _MBC1_read_ext_ram(uint16_t addr);
+
+static void _MBC2_write_MBANK_register(uint16_t mbc_reg, uint8_t byte);
+static uint8_t _MBC2_read_rom(uint32_t addr);
+static void _MBC2_write_ext_ram(uint16_t addr, uint8_t byte);
+static uint8_t _MBC2_read_ext_ram(uint16_t addr);
 
 #endif // ROM_H

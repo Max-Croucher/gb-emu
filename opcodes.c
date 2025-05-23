@@ -246,7 +246,7 @@ InstructionResult block01(uint8_t opcode) {
     } else { //LD r8, r8 | load r8 into r8
         if ((((opcode>>3)&7) == R8B) && ((opcode&7) == R8B)) { // Breakpoint
             fprintf(stderr, "Breakpoint B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B),get_r8(R8C),get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L));
-            //exit(EXIT_SUCCESS);
+            exit(EXIT_SUCCESS);
         }
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,0};
         set_r8((opcode>>3)&7, get_r8(opcode&7));

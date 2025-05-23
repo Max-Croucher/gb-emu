@@ -16,6 +16,11 @@
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
 bool LOOP = 1; //extern
+extern void (*write_MBANK_register)(uint16_t, uint8_t); //extern
+extern uint8_t (*read_rom)(uint32_t); //extern
+extern void (*write_ext_ram)(uint16_t, uint8_t); //extern
+extern uint8_t (*read_ext_ram)(uint16_t); //extern
+
 extern bool TIMA_oddity;
 extern uint8_t* ram;
 extern gbRom rom;
@@ -224,7 +229,7 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
     if (addr < 0x8000) { //mbc registers
-        mbank_register(addr, byte);
+        write_MBANK_register(addr, byte);
         return;
     }
 
