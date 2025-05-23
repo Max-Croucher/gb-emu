@@ -15,10 +15,22 @@ gbRom rom; //extern
 extern uint8_t* ram;
 
 static bool MBANK_mode = 0;
-static uint8_t MBANK_reg_BANK1 = 1;
+static uint16_t MBANK_reg_BANK1 = 1;
 static uint8_t MBANK_reg_BANK2 = 0;
 static bool MBANK_RAMG = 0;
 static bool MBANK1_is_MBC1M = 0;
+// static bool MBANK3_RTC_latch = 1;
+// static bool MBANK3_RTC_last_latch = 1;
+// static uint8_t MBANK3_RTC_S = 0;
+// static uint8_t MBANK3_RTC_M = 0;
+// static uint8_t MBANK3_RTC_H = 0;
+// static uint8_t MBANK3_RTC_DL = 0;
+// static uint8_t MBANK3_RTC_DH = 0;
+// static uint8_t MBANK3_RTC_latch_S = 0;
+// static uint8_t MBANK3_RTC_latch_M = 0;
+// static uint8_t MBANK3_RTC_latch_H = 0;
+// static uint8_t MBANK3_RTC_latch_DL = 0;
+// static uint8_t MBANK3_RTC_latch_DH = 0;
 
 
 void (*write_MBANK_register)(uint16_t, uint8_t); //extern
@@ -53,7 +65,7 @@ void print_header() {
 
 int decode_rom_size(uint8_t romcode) {
     /* Decode the rom size indicated in a gameboy header, returns the number of bytes */
-    if (romcode > 7) print_error("Unable to decode rom size.");
+    if (romcode > 8) print_error("Unable to decode rom size.");
     return 1<<(romcode+15); //0 means 32K, 1 means 64k and so on.
 }
 
@@ -230,11 +242,41 @@ void initialise_rom_address_functions(void) {
         write_ext_ram = &_MBC2_write_ext_ram;
         read_ext_ram = & _MBC2_read_ext_ram;
         break;
+    // case 0x0F:
+    // case 0x10:
+    // case 0x11:
+    // case 0x12:
+    // case 0x13: // MBC3
+    //     write_MBANK_register = &_MBC3_write_MBANK_register;
+    //     read_rom = &_MBC3_read_rom;
+    //     write_ext_ram = &_MBC3_write_ext_ram;
+    //     read_ext_ram = & _MBC3_read_ext_ram;
+    //     break;
+    case 0x19:
+    case 0x1A:
+    case 0x1B:
+    case 0x1C:
+    case 0x1D:
+    case 0x1E: // MBC5
+        write_MBANK_register = &_MBC5_write_MBANK_register;
+        read_rom = &_MBC5_read_rom;
+        write_ext_ram = &_MBC5_write_ext_ram;
+        read_ext_ram = & _MBC5_read_ext_ram;
+        break;
     default:
         print_error("MBANK type is not recognised or not supported!");
     }
 }
 
+
+// void freeze_mbank3_rtc(void) {
+//     /* latch the current states of MBANK3 RTC registers */
+//     MBANK3_RTC_latch_S = MBANK3_RTC_S;
+//     MBANK3_RTC_latch_M = MBANK3_RTC_M;
+//     MBANK3_RTC_latch_H = MBANK3_RTC_H;
+//     MBANK3_RTC_latch_DL = MBANK3_RTC_DL;
+//     MBANK3_RTC_latch_DH = MBANK3_RTC_DH;
+// }
 
 static void _NO_MBC_write_MBANK_register(uint16_t mbc_reg, uint8_t byte) {
     /* Handle writing to the ROM with no MBANK. ignore */
@@ -270,7 +312,7 @@ static void _MBC1_write_MBANK_register(uint16_t addr, uint8_t byte) {
         MBANK_reg_BANK1 = byte & 0x1F;
         if (MBANK_reg_BANK1 == 0) MBANK_reg_BANK1 = 1;
         break;
-    case 2: // 0x4000-0x6000 RAM bank switch and upper bits of ROM bank
+    case 2: // 0x4000-0x5FFF RAM bank switch and upper bits of ROM bank
         MBANK_reg_BANK2 = byte&3;
         break;
     default:
@@ -354,7 +396,7 @@ static void _MBC2_write_MBANK_register(uint16_t addr, uint8_t byte) {
 
 
 static uint8_t _MBC2_read_rom(uint32_t addr) {
-    /* Read from ROM, factoring in MBANK1 Multicart bank switching. Addr normalisation is irrelevant */
+    /* Read from ROM, factoring in MBANK2 bank switching. Addr normalisation is irrelevant */
     if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= ((MBANK_reg_BANK1&0xF)<<14); // Include MBANK ROM id to bits 17-14. this is only 4 bits long
@@ -382,6 +424,159 @@ uint8_t _MBC2_read_ext_ram(uint16_t addr) {
     if (MBANK_RAMG) {
         addr &= 0x01FF; // Truncate to bits 8-0
         return *(rom.ram + addr)|0xF0; // only the lower 4 bits are usable
+    }
+    return 0xFF;
+}
+
+
+// static void _MBC3_write_MBANK_register(uint16_t addr, uint8_t byte) {
+//     /* Handle writing to an MBANK3 register */
+//     switch (addr >> 13)
+//     {
+//     case 0: // 0x0000-0x1FFF RAM enable
+//         if (rom.carttype == 12 || rom.carttype == 13) MBANK_RAMG = ((byte&0xF) == 0x0A);
+//         break;
+//     case 1: // 0x2000-0x3FFF ROM bank switch
+//         MBANK_reg_BANK1 = byte & 0x7F;
+//         if (MBANK_reg_BANK1 == 0) MBANK_reg_BANK1 = 1;
+//         break;
+//     case 2: // 0x4000-0x5FFF RAM bank switch or RTC register
+//         MBANK_reg_BANK2 = byte&0xF;
+//         break;
+//     case 3: // 0x6000-0x7FFF RTC Latch - Freeze RTC registers for reading
+//         MBANK3_RTC_last_latch = MBANK3_RTC_latch;
+//         MBANK3_RTC_latch = byte&1;
+//         if (MBANK3_RTC_latch && !MBANK3_RTC_last_latch) freeze_mbank3_rtc(); // Freeze clock if bit 0 goes high
+//     default:
+//         MBANK_mode = byte&1;
+//         break;
+//     }
+// }
+
+
+// static uint8_t _MBC3_read_rom(uint32_t addr) {
+//     /* Read from ROM, factoring in MBANK3 bank switching. Addr normalisation is irrelevant */
+//     if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
+//         addr &= 0x3FFF; // Truncate to bits 13-0
+//         addr |= (MBANK_reg_BANK1<<14); // Include MBANK ROM id to bits 21-14.
+//         addr &= (rom.romsize-1); // Truncate to rom size
+//         return *(rom.rom + addr);
+//     } else { // reading from 0x0000-0x3FFF
+//         addr &= 0x3FFF; // Truncate to bits 13-0
+//         addr &= (rom.romsize-1); // Truncate to rom size
+//         return *(rom.rom + addr);
+//     }
+// }
+
+
+// static void _MBC3_write_ext_ram(uint16_t addr, uint8_t byte) {
+//     /* Write to external MBANK3 RAM or RTC registers. Addr is normalised to 0 */
+//     if (MBANK_RAMG) {
+//         if (MBANK_reg_BANK2 < 7) {
+//             addr &= 0x01FFF; // Truncate to bits 12-0
+//             addr += (MBANK_reg_BANK2&3)<<13; // Include MBANK RAM id
+//             addr &= (rom.ramsize-1); // Truncate to ram size
+//             *(rom.ram + addr) = byte;
+//         } else if (MBANK_reg_BANK2 == 8) {
+//             MBANK3_RTC_latch_S = byte;
+//             MBANK3_RTC_S = byte;
+//         } else if (MBANK_reg_BANK2 == 9) {
+//             MBANK3_RTC_latch_M = byte;
+//             MBANK3_RTC_M = byte;
+//         } else if (MBANK_reg_BANK2 == 0xA) {
+//             MBANK3_RTC_latch_H = byte;
+//             MBANK3_RTC_H = byte;
+//         } else if (MBANK_reg_BANK2 == 0xB) {
+//             MBANK3_RTC_latch_DL = byte;
+//             MBANK3_RTC_DL = byte;
+//         } else if (MBANK_reg_BANK2 == 0xC) {
+//             MBANK3_RTC_latch_DL = byte;
+//             MBANK3_RTC_DL = byte;
+//         }
+//     }
+// }
+
+
+// uint8_t _MBC3_read_ext_ram(uint16_t addr) {
+//     /* Read from external MBANK3 RAM or latched RTC registers. Addr is normalised to 0 */
+//     if (MBANK_RAMG) {
+//         if (MBANK_reg_BANK2 < 7) {
+//             addr &= 0x01FFF; // Truncate to bits 12-0
+//             addr += (MBANK_reg_BANK2&3)<<13; // Include MBANK RAM id
+//             addr &= (rom.ramsize-1); // Truncate to ram size
+//             return *(rom.ram + addr);
+//         } else if (MBANK_reg_BANK2 == 8) {
+//             return MBANK3_RTC_latch_S;
+//         } else if (MBANK_reg_BANK2 == 9) {
+//             return MBANK3_RTC_latch_M;
+//         } else if (MBANK_reg_BANK2 == 0xA) {
+//             return MBANK3_RTC_latch_H;
+//         } else if (MBANK_reg_BANK2 == 0xB) {
+//             return MBANK3_RTC_latch_DL;
+//         } else if (MBANK_reg_BANK2 == 0xC) {
+//             return MBANK3_RTC_latch_DH;
+//         }
+//     }
+//     return 0xFF;
+// }
+
+
+static void _MBC5_write_MBANK_register(uint16_t addr, uint8_t byte) {
+    /* Handle writing to an MBANK5 register */
+    switch (addr >> 12)
+    {
+    case 0:
+    case 1: // 0x0000-0x1FFF RAM enable
+        if (rom.carttype == 0x1A || rom.carttype == 0x1B || rom.carttype == 0x1D || rom.carttype == 0x1E) MBANK_RAMG = ((byte&0xF) == 0xA);
+        break;
+    case 2: // 0x2000-0x2FFF ROM bank switch lower 8 bits
+        MBANK_reg_BANK1 &= 0x0100;
+        MBANK_reg_BANK1 |= byte;
+        break;
+    case 3: // 0x3000-0x3FFF ROM bank switch bit 8
+        MBANK_reg_BANK1 &= 0x00FF;
+        MBANK_reg_BANK1 |= (byte&1)<<8;
+        break;
+    case 4: // 0x4000-0x4FFF RAM bank switch
+        MBANK_reg_BANK2 = byte&0xF;
+        break;
+    default:
+        break;
+    }
+}
+
+
+static uint8_t _MBC5_read_rom(uint32_t addr) {
+    /* Read from ROM, factoring in MBANK5 bank switching. Addr normalisation is irrelevant */
+    if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
+        addr &= 0x3FFF; // Truncate to bits 13-0
+        addr |= MBANK_reg_BANK1<<14; // Include MBANK ROM id to bits 22-14. this is 9 bits long
+        addr &= (rom.romsize-1); // Truncate to rom size
+        return *(rom.rom + addr);
+    } else { // reading from 0x0000-0x3FFF
+        addr &= 0x3FFF; // Truncate to bits 13-0
+        addr &= (rom.romsize-1); // Truncate to rom size
+        return *(rom.rom + addr);
+    }
+}
+
+
+static void _MBC5_write_ext_ram(uint16_t addr, uint8_t byte) {
+    /* Write to external MBANK5 RAM. Addr is normalised to 0 */
+    if (MBANK_RAMG) {
+        addr &= 0x0FFF; // Truncate to bit 12
+        addr += (MBANK_reg_BANK2&0xF)<<13;
+        *(rom.ram + addr) = byte;
+    }
+}
+
+
+uint8_t _MBC5_read_ext_ram(uint16_t addr) {
+    /* Read from external MBANK5 RAM. Addr is normalised to 0 */
+    if (MBANK_RAMG) {
+        addr &= 0x0FFF; // Truncate to bit 12
+        addr += (MBANK_reg_BANK2&0xF)<<13;
+        return *(rom.ram + addr);
     }
     return 0xFF;
 }

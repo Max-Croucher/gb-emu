@@ -3,7 +3,9 @@ from pathlib import Path
 
 ROMDIRS = [
     Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc1"),
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc2")
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc2"),
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc5"),
+    #Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance")
 ]
 EMU = Path("/home/max/Documents/stuff/programming/repos/gb-emu/gbemu")
 
@@ -20,7 +22,7 @@ def main():
             failed.append(testfile)
         elif "Breakpoint B/C/D/E/H/L = 03/05/08/0d/15/22" not in err.decode('utf-8'):
             unknown.append(testfile)
-    print(f"Failed {len(failed)} tests")
+    print(f"Passed {len(testfiles) - len(failed) - len(unknown)} tests")
     if len(failed) > 0:
         print("Failed tests:")
         for f in failed:
