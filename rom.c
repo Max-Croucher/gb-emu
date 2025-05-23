@@ -14,10 +14,12 @@
 gbRom rom; //extern
 extern uint8_t* ram;
 
-uint8_t rom_banking_high_bits = 0;
-bool banking_mode_select = 0;
-bool ext_ram_bank = 0;
-bool ext_ram_enable = 0;
+bool MBANK1_mode = 0;
+uint8_t MBANK1_reg_BANK1 = 1;
+uint8_t MBANK1_reg_BANK2 = 0;
+bool MBANK1_RAMG = 0;
+bool MBANK1_is_MBC1M = 0;
+
 
 void print_error(char errormsg[]) {
     /* print an error message and exit */
@@ -30,13 +32,13 @@ void print_header() {
     /* print the contents of a gameboy header */
     fprintf(stderr,"Header contents:\n");
     fprintf(stderr,"Title:          %s\n", rom.title);
-    fprintf(stderr,"Licensee (new): %d\n", rom.new_licensee);
+    fprintf(stderr,"Licensee (new): %c%c\n", rom.new_licensee>>8, rom.new_licensee&0xFF);
     fprintf(stderr,"Super Gameboy:  %d\n", rom.sgbflag);
     fprintf(stderr,"Cartrige Type:  %d\n", rom.carttype);
     fprintf(stderr,"ROM Size Code:  %d\n", rom.romsize);
     fprintf(stderr,"RAM Size Code:  %d\n", rom.ramsize);
-    fprintf(stderr,"Global Release: %d\n", rom.locale);
-    fprintf(stderr,"Licensee (old): %d\n", rom.old_licensee);
+    fprintf(stderr,"Global Release: 0x%.2x\n", rom.locale);
+    fprintf(stderr,"Licensee (old): 0x%.2x\n", rom.old_licensee);
     fprintf(stderr,"Version:        %d\n", rom.version);
 }
 
@@ -135,8 +137,9 @@ void load_rom(char filename[]) {
     if (bytes_read != rom.romsize) print_error("Unable to load rom file.");
 
     fprintf(stderr,"Successfully loaded rom file.\n");
-
 	fclose(romfile);
+    detect_multicart(); // determine if the rom contains a multicart
+    if (MBANK1_is_MBC1M) fprintf(stderr, "This ROM is a MBC1B Multicart\n");
 }
 
 
@@ -171,6 +174,7 @@ void init_ram() {
     // memcpy(ram+0xFF00, &initial_registers, 128);
 }
 
+
 void mbank_register(uint16_t addr, uint8_t byte) {
     /* Handle writing to an mbank register */
     //fprintf(stderr, "Received write with address 0x%.4x and value 0x%.2x\n", addr, byte);
@@ -182,25 +186,15 @@ void mbank_register(uint16_t addr, uint8_t byte) {
     case 2: // MBC1 + RAM
     case 3: // MBC1 + RAM + BATTERY
         if (addr < 0x2000) { // RAM enable
-            if (rom.carttype == 2 || rom.carttype == 3) ext_ram_enable = (byte == 0xA);
+            if (rom.carttype == 2 || rom.carttype == 3) MBANK1_RAMG = ((byte&0xF) == 0xA);
             //fprintf(stderr, "RAM enable set to %s.\n", (byte == 0xA) ? "ON" : "OFF");
         } else if (addr < 0x4000) { // ROM bank switch
-            byte &= 0x1F;
-            if (byte == 0) byte += 1;
-            uint8_t num_banks = rom.romsize>>14;
-            uint8_t bank_id = byte&(num_banks-1);
-            if (banking_mode_select) bank_id += rom_banking_high_bits << 5;
-            //fprintf(stderr, "Switching ROM bank to %d\n", bank_id);
-            memcpy(ram+0x4000, rom.rom+(bank_id*0x4000), 0x4000);
-
+            MBANK1_reg_BANK1 = byte & 0x1F;
+            if (MBANK1_reg_BANK1 == 0) MBANK1_reg_BANK1 = 1;
         } else if (addr < 0x6000) { // RAM bank switch and upper bits of ROM bank
-            if (rom.ramsize >= 524288) {
-                rom_banking_high_bits = byte&3;
-            } else {
-                ext_ram_bank = byte&3;
-            }
+            MBANK1_reg_BANK2 = byte&3;
         } else { // ROM banking mode select
-            banking_mode_select = byte&1;
+            MBANK1_mode = byte&1;
         }
         break;
     default:
@@ -208,18 +202,78 @@ void mbank_register(uint16_t addr, uint8_t byte) {
     }
 }
 
+
 void write_ext_ram(uint16_t addr, uint8_t byte) {
-    /* Write to external cartridge RAM */
-    if (!ext_ram_enable) {
-        return;
+    /* Write to external cartridge RAM. Addr is normalised to 0 */
+    if (MBANK1_RAMG) {
+        addr &= 0x0FFF; // Truncate to bits 12-0
+        addr |= (MBANK1_reg_BANK2*MBANK1_mode)<<13; // Add MBANK RAM id to bits 14-13 if mode select is 1
+        addr &= (rom.ramsize-1); // Truncate to ram size
+        *(rom.ram + addr) = byte;
     }
-    *(rom.ram + (ext_ram_bank*0x4000) + addr) = byte;
 }
 
+
 uint8_t read_ext_ram(uint16_t addr) {
-    /* Read to external cartridge RAM */
-    if (!ext_ram_enable) {
-        return 0xFF;
+    /* Read to external cartridge RAM. Addr is normalised to 0 */
+    if (MBANK1_RAMG) {
+        addr &= 0x0FFF; // Truncate to bits 12-0
+        addr += (MBANK1_reg_BANK2*MBANK1_mode)<<13; // Include MBANK RAM id to bits 14-13 if mode select is 1
+        addr &= (rom.ramsize-1); // Truncate to ram size
+        return *(rom.ram + addr);
+    } else {
+        return 0xFF; // RAM is disabled
     }
-    return *(rom.ram + (ext_ram_bank*0x4000) + addr);
+}
+
+
+uint8_t read_rom(uint32_t addr) {
+    /* Read from ROM, factoring in bank switching. Addr normalisation is irrelevant */
+    if (!MBANK1_is_MBC1M) { // NOT a multicart
+        if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
+            addr &= 0x3FFF; // Truncate to bits 13-0
+            addr |= (MBANK1_reg_BANK1<<14); // Include MBANK ROM id to bits 18-14
+            addr |= (MBANK1_reg_BANK2<<19); // Include MBANK RAM id to bits 20-19
+            addr &= (rom.romsize-1); // Truncate to rom size
+            return *(rom.rom + addr);
+        } else { // reading from 0x0000-0x3FFF
+            addr &= 0x3FFF; // Truncate to bits 13-0
+            // DO NOT Include MBANK ROM id at bits 18-14
+            addr |= ((MBANK1_reg_BANK2*MBANK1_mode)<<19); // Include MBANK RAM id to bits 20-19 if mode select is 1
+            addr &= (rom.romsize-1); // Truncate to rom size
+            return *(rom.rom + addr);
+        }
+    } else { // A multicart
+        if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
+            addr &= 0x3FFF; // Truncate to bits 13-0
+            addr |= ((MBANK1_reg_BANK1&0xF)<<14); // Include MBANK ROM id to bits 17-14. Note in MBC1M mode, this is only 4 bits long
+            addr |= (MBANK1_reg_BANK2<<18); // Include MBANK RAM id to bits 19-18
+            addr &= (rom.romsize-1); // Truncate to rom size
+            return *(rom.rom + addr);
+        } else { // reading from 0x0000-0x3FFF
+            addr &= 0x3FFF; // Truncate to bits 13-0
+            // DO NOT Include MBANK ROM id at bits 17-14
+            addr |= ((MBANK1_reg_BANK2*MBANK1_mode)<<18); // Include MBANK RAM id to bits 19-18 if mode select is 1
+            addr &= (rom.romsize-1); // Truncate to rom size
+            return *(rom.rom + addr);
+        }
+    }
+}
+
+
+void detect_multicart(void) {
+    /* if the ROM uses MBC1, check if the game contains a multicart by verifying
+    at least three of the first four banks contains the NINTENDO logo checksum
+    (i.e. 0x0104-0x0133 has the appropriate checksum) */
+    if (rom.carttype == 0 || rom.carttype > 3) return; // not MBC1
+    if (rom.romsize != 1<<20) return; // not 1Mb
+    uint8_t num_successes = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        uint8_t checksum = 0x46;
+        for (uint32_t addr = 0x4000*i + 0x0104; addr < 0x4000*i + 0x0134; addr++) {
+            checksum -= *(rom.rom + addr);
+        }
+        if (!checksum) num_successes++;
+    }
+    MBANK1_is_MBC1M = (num_successes>2);
 }

@@ -286,6 +286,8 @@ void write_byte(uint16_t addr, uint8_t byte) {
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
 
+    if (addr < 0x8000) return read_rom(addr); // Read from ROM
+
     if (addr >= 0xA000 && addr < 0xC000) { // Reading from external RAM
         return read_ext_ram(addr-0xA000);
     }

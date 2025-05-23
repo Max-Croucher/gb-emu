@@ -34,6 +34,8 @@ void init_ram(void);
 void mbank_register(uint16_t mbc_reg, uint8_t byte);
 void write_ext_ram(uint16_t addr, uint8_t byte);
 uint8_t read_ext_ram(uint16_t addr);
+uint8_t read_rom(uint32_t addr);
+void detect_multicart(void);
 
 
 #endif // ROM_H
