@@ -16,7 +16,7 @@ extern uint8_t* ram;
 
 uint8_t rom_banking_high_bits = 0;
 bool banking_mode_select = 0;
-bool ext_ram_offset = 0;
+bool ext_ram_bank = 0;
 bool ext_ram_enable = 0;
 
 void print_error(char errormsg[]) {
@@ -178,11 +178,11 @@ void mbank_register(uint16_t addr, uint8_t byte) {
     {
     case 0: // no MBC
         break;
-    case 1:
-    case 2:
-    case 3: //MBC1
+    case 1: // MBC1
+    case 2: // MBC1 + RAM
+    case 3: // MBC1 + RAM + BATTERY
         if (addr < 0x2000) { // RAM enable
-            ext_ram_enable = (byte == 0xA);
+            if (rom.carttype == 2 || rom.carttype == 3) ext_ram_enable = (byte == 0xA);
             //fprintf(stderr, "RAM enable set to %s.\n", (byte == 0xA) ? "ON" : "OFF");
         } else if (addr < 0x4000) { // ROM bank switch
             byte &= 0x1F;
@@ -194,7 +194,11 @@ void mbank_register(uint16_t addr, uint8_t byte) {
             memcpy(ram+0x4000, rom.rom+(bank_id*0x4000), 0x4000);
 
         } else if (addr < 0x6000) { // RAM bank switch and upper bits of ROM bank
-            rom_banking_high_bits = byte&3;
+            if (rom.ramsize >= 524288) {
+                rom_banking_high_bits = byte&3;
+            } else {
+                ext_ram_bank = byte&3;
+            }
         } else { // ROM banking mode select
             banking_mode_select = byte&1;
         }
@@ -209,7 +213,7 @@ void write_ext_ram(uint16_t addr, uint8_t byte) {
     if (!ext_ram_enable) {
         return;
     }
-    *(rom.ram + ext_ram_offset + addr) = byte;
+    *(rom.ram + (ext_ram_bank*0x4000) + addr) = byte;
 }
 
 uint8_t read_ext_ram(uint16_t addr) {
@@ -217,5 +221,5 @@ uint8_t read_ext_ram(uint16_t addr) {
     if (!ext_ram_enable) {
         return 0xFF;
     }
-    return *(rom.ram + ext_ram_offset + addr);
+    return *(rom.ram + (ext_ram_bank*0x4000) + addr);
 }
