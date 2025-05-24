@@ -16,10 +16,11 @@
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
 bool LOOP = 1; //extern
-extern void (*write_MBANK_register)(uint16_t, uint8_t); //extern
-extern uint8_t (*read_rom)(uint32_t); //extern
-extern void (*write_ext_ram)(uint16_t, uint8_t); //extern
-extern uint8_t (*read_ext_ram)(uint16_t); //extern
+extern uint16_t system_counter;
+extern void (*write_MBANK_register)(uint16_t, uint8_t);
+extern uint8_t (*read_rom)(uint32_t);
+extern void (*write_ext_ram)(uint16_t, uint8_t);
+extern uint8_t (*read_ext_ram)(uint16_t);
 
 extern bool TIMA_oddity;
 extern uint8_t* ram;
@@ -253,7 +254,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
         joypad_io();
         return;
     }
-    if (addr == 0xFF04) *(ram+addr) = 0; //writing to DIV sets it to 0
+    if (addr == 0xFF04) system_counter &= 0x00FF; //writing to DIV sets it to 0. preserve lower 4 bits?
     //strange TIMA behaviour
     if (addr == 0xFF05) { //TIMA 
         if (!*(ram+addr)) {
@@ -299,7 +300,7 @@ uint8_t read_byte(uint16_t addr) {
 
     if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
-
+    if (addr == 0xFF04) return system_counter>>8; //reading DIV
     // if (addr > 0xFF00) { //Special instructions
     //     return *(ram+addr) | (write_masks[addr&0xFF]); // set unreadable bits high
     // }

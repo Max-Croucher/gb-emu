@@ -305,7 +305,7 @@ static void _MBC1_write_MBANK_register(uint16_t addr, uint8_t byte) {
     switch (addr >> 13)
     {
     case 0: // 0x0000-0x1FFF RAM enable
-        if (rom.carttype == 2 || rom.carttype == 3) MBANK_RAMG = ((byte&0xF) == 0xA);
+        if ((rom.carttype == 2 || rom.carttype == 3) && rom.ramsize) MBANK_RAMG = ((byte&0xF) == 0xA);
         break;
         //fprintf(stderr, "RAM enable set to %s.\n", (byte == 0xA) ? "ON" : "OFF");
     case 1: // 0x2000-0x3FFF ROM bank switch
@@ -527,7 +527,7 @@ static void _MBC5_write_MBANK_register(uint16_t addr, uint8_t byte) {
     {
     case 0:
     case 1: // 0x0000-0x1FFF RAM enable
-        if (rom.carttype == 0x1A || rom.carttype == 0x1B || rom.carttype == 0x1D || rom.carttype == 0x1E) MBANK_RAMG = ((byte&0xF) == 0xA);
+        if ((rom.carttype == 0x1A || rom.carttype == 0x1B || rom.carttype == 0x1D || rom.carttype == 0x1E) && rom.ramsize) MBANK_RAMG = ((byte&0xF) == 0xA);
         break;
     case 2: // 0x2000-0x2FFF ROM bank switch lower 8 bits
         MBANK_reg_BANK1 &= 0x0100;

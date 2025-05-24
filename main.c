@@ -33,6 +33,7 @@ Notes:
 
 bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
+uint16_t system_counter = 0xAB35; //extern
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
@@ -58,9 +59,8 @@ bool service_interrupts(void) {
 }
 
 
-bool increment_timers(uint16_t machine_ticks) {
+bool increment_timers() {
     /* Handle the incrementing and overflowing of timers */
-    if (!(machine_ticks&0x00FF)) (*(ram+0xFF04))++; //DIV
     uint8_t TAC = *(ram+0xFF07);
     bool trigger = 0;
     bool do_interrupt = 0;
@@ -68,16 +68,16 @@ bool increment_timers(uint16_t machine_ticks) {
         switch (TAC&3) // Select timer speed
         {
         case 0: //4096 Hz
-            if (!(machine_ticks&0x03FF)) {(*(ram+0xFF05))++; trigger=1;}
+            if (!(system_counter&0x03FF)) {(*(ram+0xFF05))++; trigger=1;}
             break;
         case 3: //16384 Hz
-            if (!(machine_ticks&0x00FF)) {(*(ram+0xFF05))++; trigger=1;}
+            if (!(system_counter&0x00FF)) {(*(ram+0xFF05))++; trigger=1;}
             break;
         case 2: //65536 Hz
-            if (!(machine_ticks&0x003F)) {(*(ram+0xFF05))++; trigger=1;}
+            if (!(system_counter&0x003F)) {(*(ram+0xFF05))++; trigger=1;}
             break;
         case 1: //262144 Hz
-            if (!(machine_ticks&0x000F)) {(*(ram+0xFF05))++; trigger=1;}
+            if (!(system_counter&0x000F)) {(*(ram+0xFF05))++; trigger=1;}
             break;
         }
         //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
     init_registers();
     init_graphics(&argc, argv);
     InstructionResult instruction_result = {0,0,0,0};
+    system_counter = atoi(argv[2]); // 43992 does the trick
     
     FILE *logfile;
 	logfile = fopen("cpu_states.log", "w");
@@ -103,20 +104,13 @@ int main(int argc, char *argv[]) {
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     bool stop_mode = 0;
     int16_t machine_timeout = 0;
-    uint16_t machine_ticks = 0;
     uint64_t frames = 0;
 
     //print_registers();
     uint16_t count = 0;
     while (LOOP) {
-        machine_ticks++;
-        if (machine_ticks == 0) count += 1;
-        //if (count == (8192)) break; // 64 cycles is one second
-        //if ((count == 1024)) break;
-        //12 frames is enough for Tetris's tilemap to fully load
-        //printf("%d|%d|%d|%d\n", i, machine_timeout, reg.IME, halt_state);
-
-        if (increment_timers(machine_ticks)) {
+        system_counter++;
+        if (increment_timers()) {
             if (TIMA_oddity) {
                 TIMA_oddity = 0;
             } else {
@@ -143,12 +137,13 @@ int main(int argc, char *argv[]) {
                 } else {
                     if (service_interrupts()) {
                         halt_state = 0; // clear halt state
-                        machine_timeout += 20;
+                        machine_timeout += 19;
                         //printf("ISR\n");
                     }
                 }
-                if (halt_state == 0 || halt_state == 3) {
+                if ((!machine_timeout) && (halt_state == 0 || halt_state == 3)) {
                     instruction_result = run_instruction();
+                    machine_timeout -= 1;
 
                     //if (halt_state == 2) {instruction_result.new_pc = get_r16(R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
                     if (halt_state == 3) halt_state = 0;

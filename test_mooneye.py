@@ -2,10 +2,11 @@ import subprocess
 from pathlib import Path
 
 ROMDIRS = [
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc1"),
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc2"),
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc5"),
+    # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc1"),
+    # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc2"),
+    # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc5"),
     #Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance")
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/timer")
 ]
 EMU = Path("/home/max/Documents/stuff/programming/repos/gb-emu/gbemu")
 
@@ -33,5 +34,17 @@ def main():
         for f in unknown:
             print(f"  {f}")
 
+
+def test_div():
+    testfile = Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_div-dmgABCmgb.gb")
+    for i in range(512):
+        proc = subprocess.Popen([EMU, testfile, str(43776+i-256)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        proc.wait()
+        out, err = proc.communicate()
+        if "Breakpoint B/C/D/E/H/L = 03/05/08/0d/15/22" in err.decode('utf-8'):
+            print(f"passed with {hex(43776+i-256)}")
+
+
+
 if __name__ == "__main__":
-    main()
+    test_div()

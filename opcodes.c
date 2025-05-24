@@ -14,6 +14,7 @@
 
 extern Registers reg;
 extern uint8_t* ram;
+extern uint16_t system_counter;
 
 InstructionResult block00(uint8_t opcode) {
     /* execute an instruction for an opcode beginning with 0b00 */
@@ -246,7 +247,7 @@ InstructionResult block01(uint8_t opcode) {
     } else { //LD r8, r8 | load r8 into r8
         if ((((opcode>>3)&7) == R8B) && ((opcode&7) == R8B)) { // Breakpoint
             fprintf(stderr, "Breakpoint B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B),get_r8(R8C),get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L));
-            exit(EXIT_SUCCESS);
+            //exit(EXIT_SUCCESS);
         }
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,0};
         set_r8((opcode>>3)&7, get_r8(opcode&7));
@@ -694,6 +695,7 @@ InstructionResult block11(uint8_t opcode) {
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,3};
         imm8 = read_byte(get_r16(R16PC)+1);
         set_r8(R8A, read_byte(0xFF00+imm8));
+        if (imm8 == 4) fprintf(stderr, "SYSCLK is 0x%.4x, DIV is 0x%.2x\n", system_counter, get_r8(R8A));
         break;
     case 0b11111010: // LD A, [imm16] | load the byte in [imm16] to A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+3,4};
