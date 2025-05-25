@@ -19,7 +19,7 @@ def main():
         print(testfile)
         proc = subprocess.Popen([EMU, testfile], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         proc.wait()
-        out, err = proc.communicate()
+        _, err = proc.communicate()
         if "Breakpoint B/C/D/E/H/L = 42/42/42/42/42/42" in err.decode('utf-8'):
             failed.append(testfile)
         elif "Breakpoint B/C/D/E/H/L = 03/05/08/0d/15/22" not in err.decode('utf-8'):

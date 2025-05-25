@@ -16,6 +16,8 @@
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
 bool LOOP = 1; //extern
+bool OAM_DMA = 0; //extern
+uint16_t OAM_DMA_timeout = 0; //extern
 extern uint16_t system_counter;
 extern void (*write_MBANK_register)(uint16_t, uint8_t);
 extern uint8_t (*read_rom)(uint32_t);
@@ -229,6 +231,18 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
+
+    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return; // Most of the bus is inaccessible during DMA
+
+    if (addr == 0xFF46) { // enter DMA mode
+        if (byte < 0xE0) {
+            *(ram+addr) = byte;
+            OAM_DMA = 1;
+            OAM_DMA_timeout = 640;
+        }
+        return;
+    }
+
     if (addr < 0x8000) { //mbc registers
         write_MBANK_register(addr, byte);
         return;
@@ -243,9 +257,8 @@ void write_byte(uint16_t addr, uint8_t byte) {
         write_byte(addr-0x2000, byte); //Echo RAM
         return;
     }
+
     if (addr >= 0xFEA0 && addr < 0xFEFF) return;
-
-
 
 
     if (addr == 0xFF00) { //writing to this addr queries the joypad
@@ -291,6 +304,8 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
+
+    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return 0xFF; // Most of the bus is inaccessible during DMA
 
     if (addr < 0x8000) return read_rom(addr); // Read from ROM
 

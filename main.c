@@ -37,6 +37,8 @@ uint16_t system_counter = 0xABD6; //extern
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
+extern bool OAM_DMA;
+extern uint16_t OAM_DMA_timeout;
 
 
 bool service_interrupts(void) {
@@ -108,6 +110,7 @@ int main(int argc, char *argv[]) {
     uint16_t count = 0;
     while (LOOP) {
         system_counter++;
+        //fprintf(stderr, "%d | %d | %d | %d\n", system_counter, instruction_timeout, halt_state, stop_mode);
         if (increment_timers()) {
             if (TIMA_oddity) {
                 TIMA_oddity = 0;
@@ -119,6 +122,16 @@ int main(int argc, char *argv[]) {
         if (stop_mode) {
             if ((*(ram+0xFF00)&0xF) != 0xF) stop_mode = 0; 
         } else {
+
+            if (OAM_DMA) {
+                if ((OAM_DMA_timeout&3) == 0) {
+                    uint8_t lower_addr = 160 - (OAM_DMA_timeout>>2);
+                    *(ram + 0xFE00 + lower_addr) = *(ram + ((uint16_t)(*(ram+0xFF46))<<8) + lower_addr);
+                }
+                OAM_DMA_timeout -= 1;
+                if (!OAM_DMA_timeout) OAM_DMA = 0;
+            }
+
             if (!(system_counter&3)) {
                 if (!instruction_timeout) {
                     // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x OPCODES: %s\n",

@@ -26,6 +26,7 @@ uint8_t framecount_offset = 0;
 
 uint8_t xoffset = 0;
 static uint32_t dot = 0;
+uint8_t window_internal_counter = 0;
 
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
@@ -265,14 +266,33 @@ uint8_t read_objects(ObjectAttribute attrbank[10]) {
     return objects_found;
 }
 
-uint8_t get_background_pallette(uint8_t pallette_id) {
+uint8_t get_background_palette(uint8_t palette_value) {
     /* poll the BGP register */
-    return (*(ram+0xFF47) >> (2*pallette_id))&3;
+    return (*(ram+0xFF47) >> (2*palette_value))&3;
 }
+
+
+uint8_t get_object_palette(bool palette_id, uint8_t palette_value) {
+    /* poll the BGP register */
+    if (palette_id) {
+        return (*(ram+0xFF49) >> (2*palette_value))&3;
+    }
+    return (*(ram+0xFF48) >> (2*palette_value))&3;
+}
+
+
+int compare_obj_xvalue(const void *a, const void *b) {
+    /* compare to ObjectAttributes by xpos, for sorting */
+    ObjectAttribute *objA = (ObjectAttribute *)a;
+    ObjectAttribute *objB = (ObjectAttribute *)b;
+  
+    return ((int)objB->xpos - (int)objA->xpos);
+}
+
 
 void draw_background() {
     /* Draw the background layer on the current scanline */
-    if (*(ram+0xFF40)&1 == 0) { //bg is disabled
+    if ((*(ram+0xFF40)&1) == 0) { //bg is disabled
         for (int i=0; i<160; i++) {
             texture[143-*(ram+0xFF44)][i][0] = pixvals[0];
             texture[143-*(ram+0xFF44)][i][1] = pixvals[0];
@@ -289,20 +309,80 @@ void draw_background() {
     }
     for (int i=0; i<160; i++) {
         uint8_t pix = (tiles[(i+left)>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
-        texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_pallette(pix)];
-        texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_pallette(pix)];
-        texture[143-*(ram+0xFF44)][i][2] = pixvals[get_background_pallette(pix)];
+        texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_palette(pix)];
+        texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_palette(pix)];
+        texture[143-*(ram+0xFF44)][i][2] = pixvals[get_background_palette(pix)];
     }
 }
 
 
 void draw_window() {
     /* Draw the window layer on the current scanline */
+    if ((*(ram+0xFF40)&0x21) == 0x21) { // Window Enable and BG/Window Enable bits are set
+        if (*(ram+0xFF44) >= *(ram+0xFF4A)) { // when scanline >= window Y
+            uint16_t tiles[21][8];
+            for (int i=0; i<21; i++) {
+                uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 0);
+                load_tile(tiles[i], get_tile_addr(tile_id, 0));
+            }
+            for (int screen_x_pos = *(ram+0xFF4A) - 7; screen_x_pos < 160; screen_x_pos++) {
+                uint8_t window_x_pos = screen_x_pos - (*(ram+0xFF4A) - 7);
+                //screen_y_pos is *(ram+0xFF44)
+                //window_y_pos is window_internal_counter
+
+
+                //draw pixel at (window_x_pos, window_y_pos) to (screen_x_pos, screen_y_pos)
+                uint8_t pix = (tiles[window_x_pos>>3][window_internal_counter%8] >> (14-(2*((window_x_pos%8)))))&3;
+                texture[143-*(ram+0xFF44)][screen_x_pos][0] = pixvals[get_background_palette(pix)];
+                texture[143-*(ram+0xFF44)][screen_x_pos][1] = pixvals[get_background_palette(pix)];
+                texture[143-*(ram+0xFF44)][screen_x_pos][2] = pixvals[get_background_palette(pix)];
+            }
+            window_internal_counter++;
+        }
+    }
 }
 
 
 void draw_objects(ObjectAttribute objects[10], uint8_t objects_found) {
-    /* Draw the object layer on the current scanline */
+    /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
+    if ((*(ram+0xFF40))&1) {
+        uint16_t tiles[20][8];
+        for (int8_t i = 0; i < objects_found; i++) {
+            if ((*(ram+0xFF40))&4) { // object 8x16 mode
+                load_tile(tiles[2*i], get_tile_addr(objects[i].tileid&0xFE, 1)); // &0xFE force-resets lower bit
+                load_tile(tiles[2*i+1], get_tile_addr(objects[i].tileid|0x01, 1)); // |0x01 force-sets lower bit
+            } else {
+                load_tile(tiles[i], get_tile_addr(objects[i].tileid, 1));
+            }
+        }
+        for (uint8_t i=0; i<objects_found; i++) { // draw obj in decreasing order of xvalue
+            for (uint8_t screen_x=objects[i].xpos; screen_x<160; screen_x++) {
+
+                // get object's tex coords
+                uint8_t obj_x = screen_x-objects[i].xpos;
+                if (objects[i].xflip) obj_x = 7 - obj_x; // flip obj_y if xflip is set
+                uint8_t obj_y = *(ram+0xFF44) - objects[i].ypos;
+                if (objects[i].yflip && !((*(ram+0xFF40))&4)) obj_y = 7 - obj_y; // flip obj_y if yflip is set
+                if (objects[i].yflip && ((*(ram+0xFF40))&4)) obj_y = 15 - obj_y;
+
+                // select appropiate tile map
+                uint16_t tile_line;
+                if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
+                    tile_line = tiles[i][obj_y];
+                } else if (obj_y < 8) { // object 8x16 mode,obj_y refers to upper obj
+                    tile_line = tiles[2*i][obj_y];
+                } else { // object 8x16 mode,obj_y refers to lower obj
+                    tile_line = tiles[2*i+1][obj_y-8];
+                }
+                uint8_t pixel = get_object_palette((tile_line>>(2*obj_x))&3, objects[i].palette);
+                if (pixel) { //draw if not 0
+                    texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[pixel];
+                    texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[pixel];
+                    texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[pixel];
+                }
+            }
+        }
+    }
 }
 
 
@@ -343,6 +423,7 @@ bool tick_graphics(void) {
             *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
             xoffset++;
             if (xoffset == 144) xoffset = 0;
+            window_internal_counter = 0;
             glutMainLoopEvent();
             glutPostRedisplay();
             //print_tilemaps();
@@ -360,6 +441,7 @@ bool tick_graphics(void) {
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 2; // set ppu mode to 2
             objects_found = read_objects(objects);
+            qsort(objects, objects_found, sizeof(ObjectAttribute), compare_obj_xvalue);
 
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
             *(ram+0xFF41) &= 0xFC;
@@ -412,7 +494,7 @@ void print_tilemaps(void) {
     //     for (int k=0; k<8; k++) {
     //         for (int j=0; j<32; j++) {
     //             for (int l=7; l>=0; l--){
-    //                 printf("%c", print_palette[get_background_pallette((tiles[j][k]>>(2*l))&3)]);
+    //                 printf("%c", print_palette[get_background_palette((tiles[j][k]>>(2*l))&3)]);
     //             }
     //         }
     //         printf("\n");

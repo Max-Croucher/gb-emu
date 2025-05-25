@@ -204,6 +204,7 @@ InstructionResult block00(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(ZFLAG, get_r8((opcode>>3)&7)==0);
         set_flag(HFLAG, (get_r8((opcode>>3)&7)&15) == 0);
+        if (((opcode>>3)&7) == 6) instruction_result.machine_cycles += 2;
         break;
     case 5:
     case 13: //DEC r8 | decrement r8
@@ -213,6 +214,7 @@ InstructionResult block00(uint8_t opcode) {
         set_flag(NFLAG, 1);
         set_flag(ZFLAG, working8bit==0);
         set_flag(HFLAG, (working8bit&15)==15);
+        if (((opcode>>3)&7) == 6) instruction_result.machine_cycles += 2;
         break;
     case 6:
     case 14: //LD r8, imm8 | load value imm8 into r8
@@ -252,6 +254,8 @@ InstructionResult block01(uint8_t opcode) {
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
         set_r8((opcode>>3)&7, get_r8(opcode&7));
     }
+    if (((opcode>>3)&7) == 6) instruction_result.machine_cycles += 1;
+    if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
 
     return instruction_result;
 }
@@ -277,6 +281,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(CFLAG, get_r8(R8A)<working8bit);
         set_flag(HFLAG, (get_r8(R8A)&15)<(working8bit&15));
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 1: //ADC A, r8 | add carry and contents of r8 to A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -287,6 +292,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(CFLAG, working16bit>>8>0);
         set_flag(HFLAG, working8bit>>4>0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 2: //SUB A, r8 | subtract contents of r8 from A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -297,6 +303,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 1);
         set_flag(CFLAG, working16bit>>8>0);
         set_flag(HFLAG, working8bit>>4>0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 3: //SBC A, r8 | subtract carry and contents of r8 to A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -307,6 +314,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 1);
         set_flag(CFLAG, working16bit>>8>0);
         set_flag(HFLAG, working8bit>>4>0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 4: //AND A, r8 | logical and between r8 and A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -315,6 +323,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(HFLAG, 1);
         set_flag(CFLAG, 0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 5: //XOR A, r8 | logical xor between r8 and A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -323,6 +332,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(HFLAG, 0);
         set_flag(CFLAG, 0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 6: //OR A, r8 | logical or between r8 and A
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -331,6 +341,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 0);
         set_flag(HFLAG, 0);
         set_flag(CFLAG, 0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 7: //CP A, r8 | subtract contents of r8 from A but discard result
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
@@ -339,6 +350,7 @@ InstructionResult block10(uint8_t opcode) {
         set_flag(NFLAG, 1);
         set_flag(CFLAG, imm8 > get_r8(R8A));
         set_flag(HFLAG, (imm8&15) > (get_r8(R8A)&15));
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     default:;
         fprintf(stderr, "Error: Unknown opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
@@ -367,16 +379,19 @@ InstructionResult prefixCB(uint8_t opcode) {
         set_flag(ZFLAG, (get_r8(opcode&7) & (1<<working8bit))==0);
         set_flag(HFLAG, 1);
         set_flag(NFLAG, 0);
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 1;
         break;
     case 2: //RES b3, r8 | reset bit b3 in r8 to 0
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
         working8bit = (opcode>>3)&7;
         set_r8(opcode&7, get_r8(opcode&7) & ~(1<<working8bit));
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
         break;
     case 3: //SET b3, r8 | set bit b3 in r8 to 1
         instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
         working8bit = (opcode>>3)&7;
         set_r8(opcode&7, get_r8(opcode&7) | (1<<working8bit));
+        if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
         break;
     default:
         switch (opcode>>3)
@@ -389,6 +404,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, working8bit==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00001: //RRC r8 | bit-shift rotate register r8 right, store wraparound into C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -398,6 +414,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, working8bit==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00010: //RL r8 | bit-shift rotate register r8 left, through C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -408,6 +425,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, working8bit==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00011: //RR r8 | bit-shift rotate register r8 right, through C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -418,6 +436,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, (working8bit==0));
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00100: //SLA r8 | bit-shit arithmetically register r8 left, into C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -426,6 +445,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, get_r8((opcode&7))==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00101: //SRA r8 | bit-shit arithmetically register r8 right, into C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -434,6 +454,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, get_r8((opcode&7))==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00110: //SWAP r8 | swap upper 4 and lower 4 bits in register r8
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -443,6 +464,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
             set_flag(CFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         case 0b00111: //SRL r8 | bit-shift logically register r8 right, into C
             instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
@@ -451,6 +473,7 @@ InstructionResult prefixCB(uint8_t opcode) {
             set_flag(ZFLAG, get_r8((opcode&7))==0);
             set_flag(HFLAG, 0);
             set_flag(NFLAG, 0);
+            if ((opcode&7) == 6) instruction_result.machine_cycles += 2;
             break;
         default:;
             fprintf(stderr, "Error: Unknown 0xCB prefixed opcode at PC=0x%.4x OPCODE=0x%.2x BITS=%d%d%d%d%d%d%d%d\n",
