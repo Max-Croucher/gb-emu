@@ -249,7 +249,7 @@ InstructionResult block01(uint8_t opcode) {
             fprintf(stderr, "Breakpoint B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B),get_r8(R8C),get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L));
             //exit(EXIT_SUCCESS);
         }
-        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,0};
+        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+1,1};
         set_r8((opcode>>3)&7, get_r8(opcode&7));
     }
 
@@ -362,19 +362,19 @@ InstructionResult prefixCB(uint8_t opcode) {
     switch (opcode>>6)
     {
     case 1: //BIT b3, r8 | set zflag to bit b3 in r8
-        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,3};
+        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
         working8bit = (opcode>>3)&7;
         set_flag(ZFLAG, (get_r8(opcode&7) & (1<<working8bit))==0);
         set_flag(HFLAG, 1);
         set_flag(NFLAG, 0);
         break;
     case 2: //RES b3, r8 | reset bit b3 in r8 to 0
-        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,4};
+        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
         working8bit = (opcode>>3)&7;
         set_r8(opcode&7, get_r8(opcode&7) & ~(1<<working8bit));
         break;
     case 3: //SET b3, r8 | set bit b3 in r8 to 1
-        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,4};
+        instruction_result = (InstructionResult){0,0,get_r16(R16PC)+2,2};
         working8bit = (opcode>>3)&7;
         set_r8(opcode&7, get_r8(opcode&7) | (1<<working8bit));
         break;
@@ -748,10 +748,6 @@ InstructionResult block11(uint8_t opcode) {
 InstructionResult run_instruction() {
     /* read the opcode at the PC and execute an instruction */
     uint8_t opcode = read_byte(get_r16(R16PC));
-
-
-
-
     InstructionResult instruction_result;
     switch (opcode>>6)
     {

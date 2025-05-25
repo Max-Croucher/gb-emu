@@ -33,7 +33,7 @@ Notes:
 
 bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
-uint16_t system_counter = 0xAB35; //extern
+uint16_t system_counter = 0xABD6; //extern
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
@@ -95,7 +95,6 @@ int main(int argc, char *argv[]) {
     init_registers();
     init_graphics(&argc, argv);
     InstructionResult instruction_result = {0,0,0,0};
-    system_counter = atoi(argv[2]); // 43992 does the trick
     
     FILE *logfile;
 	logfile = fopen("cpu_states.log", "w");
@@ -103,10 +102,9 @@ int main(int argc, char *argv[]) {
     bool do_ei = 0;
     uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
     bool stop_mode = 0;
-    int16_t machine_timeout = 0;
+    uint8_t instruction_timeout = 0;
     uint64_t frames = 0;
 
-    //print_registers();
     uint16_t count = 0;
     while (LOOP) {
         system_counter++;
@@ -121,54 +119,50 @@ int main(int argc, char *argv[]) {
         if (stop_mode) {
             if ((*(ram+0xFF00)&0xF) != 0xF) stop_mode = 0; 
         } else {
-            if (!machine_timeout) {
-                // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x OPCODES: %s\n",
-                //     get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
-                //     get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
-                //     get_r16(R16SP),get_r16(R16PC),
-                //     *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                //     reg.IME, halt_state, *(ram+0xFF0F),
-                //     ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
-                // );
+            if (!(system_counter&3)) {
+                if (!instruction_timeout) {
+                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x OPCODES: %s\n",
+                    //     get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
+                    //     get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
+                    //     get_r16(R16SP),get_r16(R16PC),
+                    //     *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
+                    //     reg.IME, halt_state, *(ram+0xFF0F),
+                    //     ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
+                    // );
 
-
-                if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
-                    halt_state = 0;
-                } else {
-                    if (service_interrupts()) {
-                        halt_state = 0; // clear halt state
-                        machine_timeout += 19;
-                        //printf("ISR\n");
-                    }
-                }
-                if ((!machine_timeout) && (halt_state == 0 || halt_state == 3)) {
-                    instruction_result = run_instruction();
-                    machine_timeout -= 1;
-
-                    //if (halt_state == 2) {instruction_result.new_pc = get_r16(R16PC); halt_state = 0;} // instruction after HALT: Don't increment PC
-                    if (halt_state == 3) halt_state = 0;
-                    if (do_ei) set_ime(1); // set EI late
-
-                    if (instruction_result.haltmode) { // HALT was called:
-                        if (instruction_result.haltmode == 2) {
-                            stop_mode = 1;
-                        } else {
-                            if (reg.IME) {
-                                halt_state = 1; // Halt until interrupt is executed
-                            } else if (*(ram+0xFF0F)&0x1F) {
-                                halt_state = 3; // Resume, but do instruction twice
-                            } else {
-                                halt_state = 2; // Halt until interrupt is requested
-                            }
+                    if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
+                        halt_state = 0;
+                    } else {
+                        if (service_interrupts()) {
+                            halt_state = 0; // clear halt state
+                            instruction_timeout = 5;
+                            continue;
                         }
                     }
-                    do_ei = instruction_result.eiset;
-                    machine_timeout += instruction_result.machine_cycles*4;
-                    reg.PC = instruction_result.new_pc;
-                    //print_registers();
+                    if (halt_state == 0 || halt_state == 3) {
+                        instruction_result = run_instruction();
+                        if (halt_state == 3) halt_state = 0;
+                        if (do_ei) set_ime(1); // set EI late
+
+                        if (instruction_result.haltmode) { // HALT was called:
+                            if (instruction_result.haltmode == 2) {
+                                stop_mode = 1;
+                            } else {
+                                if (reg.IME) {
+                                    halt_state = 1; // Halt until interrupt is executed
+                                } else if (*(ram+0xFF0F)&0x1F) {
+                                    halt_state = 3; // Resume, but do instruction twice
+                                } else {
+                                    halt_state = 2; // Halt until interrupt is requested
+                                }
+                            }
+                        }
+                        do_ei = instruction_result.eiset;
+                        instruction_timeout = instruction_result.machine_cycles;
+                        reg.PC = instruction_result.new_pc;
+                    }
                 }
-            } else {
-                machine_timeout -= 1;
+                instruction_timeout -= 1;
             }
             frames += tick_graphics();
             //usleep(10);
