@@ -30,8 +30,10 @@ uint8_t window_internal_counter = 0;
 
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
+uint8_t objects_found = 0;
 
 uint8_t pixvals[5] = {0xF8, 0xA0, 0x50, 0x00, 0xFF};
+uint8_t priority_object[160];
 
 bool old_stat_state = 0;
 
@@ -237,33 +239,33 @@ void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
 }
 
 
-uint8_t read_objects(ObjectAttribute attrbank[10]) {
+void read_objects(void) {
     /* builds an array of up to 10 object attributes that intersect with the current scanline */
-    uint8_t objects_found = 0;
+    objects_found = 0;
     uint8_t offset_scanline = *(ram+0xFF44) + 16;
-    bool tile8x8 = *(ram+0xFF40) & (1<<2); //1 if 8x8, 0 if 8x16
+    bool tile8x16 = *(ram+0xFF40) & 4; //1 if 8x8, 0 if 8x16
     for (int i=0; i<40; i++) {
         if (objects_found == 10) break;
-        uint8_t ypos = *(ram+0xFFE0+(i*4));
+        uint8_t ypos = *(ram+0xFE00+(i*4));
+        //printf("(LY=%d adjusted to %d) Object %d: ypos is %d (true %d) [%d%d%d%d]\n", *(ram+0xFF44), offset_scanline, i, ypos, ((int)ypos)-16, (tile8x8 && ypos<=offset_scanline), ((!tile8x8) && ypos<=offset_scanline), (tile8x8 && ypos+8>offset_scanline), ((!tile8x8) && ypos+16>offset_scanline));
         if (
-            (tile8x8 && ypos+8>offset_scanline) && //8x8 sprite isn't above scanline
-            (!tile8x8 && ypos+16>offset_scanline) && //8x16 isn't above scanline
-            (ypos<=offset_scanline) //sprite isn't below scanline
+            (!(tile8x16) && ypos<=offset_scanline && ypos+8>offset_scanline) || 
+            (tile8x16 && ypos<=offset_scanline  && ypos+16>offset_scanline)
         ) { //Object intersects scanline
-            uint8_t flags = *(ram+0xFFE0+(i*4)+3);
-            attrbank[objects_found] = (ObjectAttribute){
+            //printf("found\n");
+            uint8_t flags = *(ram+0xFE00+(i*4)+3);
+            objects[objects_found] = (ObjectAttribute){
                 .ypos = ypos,
-                .xpos = *(ram+0xFFE0+(i*4)+1),
-                .tileid = *(ram+0xFFE0+(i*4)+2),
+                .xpos = *(ram+0xFE00+(i*4)+1),
+                .tileid = *(ram+0xFE00+(i*4)+2),
                 .priority = flags & (1<<7),
-                .yflip = flags & (1<<7),
-                .xflip = flags & (1<<7),
-                .palette = flags & (1<<7)
+                .yflip = flags & (1<<6),
+                .xflip = flags & (1<<5),
+                .palette = flags & (1<<4)
             };
             objects_found++;
         }
     }
-    return objects_found;
 }
 
 uint8_t get_background_palette(uint8_t palette_value) {
@@ -286,7 +288,7 @@ int compare_obj_xvalue(const void *a, const void *b) {
     ObjectAttribute *objA = (ObjectAttribute *)a;
     ObjectAttribute *objB = (ObjectAttribute *)b;
   
-    return ((int)objB->xpos - (int)objA->xpos);
+    return ((int)objA->xpos) - ((int)objB->xpos);
 }
 
 
@@ -343,42 +345,44 @@ void draw_window() {
 }
 
 
-void draw_objects(ObjectAttribute objects[10], uint8_t objects_found) {
+void draw_objects(void) {
     /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
-    if ((*(ram+0xFF40))&1) {
+    if (((*(ram+0xFF40))&1) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
         uint16_t tiles[20][8];
-        for (int8_t i = 0; i < objects_found; i++) {
+        memset(priority_object, 255, 160); // array priority_object will store the highest priority object to render per xvalue. Initialise to an invalid value
+        for (int8_t i = objects_found; i >= 0; i--) {
             if ((*(ram+0xFF40))&4) { // object 8x16 mode
                 load_tile(tiles[2*i], get_tile_addr(objects[i].tileid&0xFE, 1)); // &0xFE force-resets lower bit
                 load_tile(tiles[2*i+1], get_tile_addr(objects[i].tileid|0x01, 1)); // |0x01 force-sets lower bit
             } else {
                 load_tile(tiles[i], get_tile_addr(objects[i].tileid, 1));
             }
+            for (uint16_t x = objects[i].xpos-8; x<objects[i].xpos; x++) {
+                priority_object[x] = i;
+            }
         }
-        for (uint8_t i=0; i<objects_found; i++) { // draw obj in decreasing order of xvalue
-            for (uint8_t screen_x=objects[i].xpos; screen_x<160; screen_x++) {
-
-                // get object's tex coords
-                uint8_t obj_x = screen_x-objects[i].xpos;
-                if (objects[i].xflip) obj_x = 7 - obj_x; // flip obj_y if xflip is set
-                uint8_t obj_y = *(ram+0xFF44) - objects[i].ypos;
-                if (objects[i].yflip && !((*(ram+0xFF40))&4)) obj_y = 7 - obj_y; // flip obj_y if yflip is set
-                if (objects[i].yflip && ((*(ram+0xFF40))&4)) obj_y = 15 - obj_y;
-
-                // select appropiate tile map
+        for (uint8_t screen_x=0; screen_x<160; screen_x++) {
+            if (priority_object[screen_x] != 255) {
+                ObjectAttribute target_object = objects[priority_object[screen_x]];
+                uint8_t sprite_x = screen_x - (target_object.xpos-8);
+                if (!target_object.xflip) sprite_x = 7 - sprite_x;
+                uint8_t sprite_y = *(ram+0xFF44) - (target_object.ypos-16);
+                if (target_object.yflip && !((*(ram+0xFF40))&4)) sprite_y = 7 - sprite_y;
+                if (target_object.yflip && ((*(ram+0xFF40))&4)) sprite_y = 15 - sprite_y;
                 uint16_t tile_line;
                 if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
-                    tile_line = tiles[i][obj_y];
-                } else if (obj_y < 8) { // object 8x16 mode,obj_y refers to upper obj
-                    tile_line = tiles[2*i][obj_y];
-                } else { // object 8x16 mode,obj_y refers to lower obj
-                    tile_line = tiles[2*i+1][obj_y-8];
+                    tile_line = tiles[priority_object[screen_x]][sprite_y];
+                } else { // object 8x16 mode
+                    if (sprite_y < 8) {
+                        tile_line = tiles[2*priority_object[screen_x]][sprite_y];
+                    }
+                        tile_line = tiles[2*priority_object[screen_x] + 1][sprite_y-8];
                 }
-                uint8_t pixel = get_object_palette((tile_line>>(2*obj_x))&3, objects[i].palette);
-                if (pixel) { //draw if not 0
-                    texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[pixel];
-                    texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[pixel];
-                    texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[pixel];
+                uint8_t pixel = (tile_line>>(2*sprite_x))&3;
+                if (pixel) { // skip if transparent
+                    texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
+                    texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
+                    texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
                 }
             }
         }
@@ -415,8 +419,6 @@ bool tick_graphics(void) {
     old_stat_state == current_stat_state;
 
     if (lcd_enable) {
-        ObjectAttribute objects[10];
-        uint8_t objects_found = 0;
         if (dot == 65564) { // enter VBLANK
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 1; // set ppu mode to 1
@@ -427,6 +429,7 @@ bool tick_graphics(void) {
             glutMainLoopEvent();
             glutPostRedisplay();
             //print_tilemaps();
+            //print_sprites();
             end = clock();
             frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
             framecount_offset++;
@@ -440,15 +443,16 @@ bool tick_graphics(void) {
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 2; // set ppu mode to 2
-            objects_found = read_objects(objects);
+            read_objects();
             qsort(objects, objects_found, sizeof(ObjectAttribute), compare_obj_xvalue);
+            //print_sprites();
 
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 3; // set ppu mode to 3
             draw_background();
             draw_window();
-            draw_objects(objects, objects_found);
+            draw_objects();
 
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 232) { // Enter Hblank
             *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
@@ -508,4 +512,58 @@ void print_tilemaps(void) {
     //     }
     //     printf("\n");
     // }
+}
+
+
+void print_sprites(void) {
+    /* Debug util to display each sprite */
+    char print_palette[4] = {' ', '.', 'o', '0'};
+    // printf("Frame!\n");
+    // printf("Palette 0: %.2x [%c%c%c%c]\n", *(ram+0xFF48), print_palette[(*(ram+0xFF48)>>6)&3], print_palette[(*(ram+0xFF48)>>4)&3], print_palette[(*(ram+0xFF48)>>2)&3], print_palette[(*(ram+0xFF48)>>0)&3]);
+    // printf("Palette 1: %.2x [%c%c%c%c]\n", *(ram+0xFF49), print_palette[(*(ram+0xFF49)>>6)&3], print_palette[(*(ram+0xFF49)>>4)&3], print_palette[(*(ram+0xFF49)>>2)&3], print_palette[(*(ram+0xFF49)>>0)&3]);
+    // for (int i=0; i<40; i++) {
+    //     uint8_t flags = *(ram+0xFE00+(i*4)+3);
+    //     ObjectAttribute object = (ObjectAttribute) {
+    //         .ypos = *(ram+0xFE00+(i*4)),
+    //         .xpos = *(ram+0xFE00+(i*4)+1),
+    //         .tileid = *(ram+0xFE00+(i*4)+2),
+    //         .priority = flags & (1<<7),
+    //         .yflip = flags & (1<<6),
+    //         .xflip = flags & (1<<5),
+    //         .palette = flags & (1<<4)
+    //     };
+    //     printf("Object %d, at position (%d, %d). TileID 0x%.2x with palette %d. Memory at 0x%.4x: (0x %.2x %.2x %.2x %.2x)\n", i, object.xpos-8, object.ypos-16, object.tileid, object.palette, 0xFE00+(i*4), *(ram+0xFE00+(i*4)), *(ram+0xFE00+(i*4))+1, *(ram+0xFE00+(i*4))+2, *(ram+0xFE00+(i*4))+3);
+    //     uint16_t sprite[8];
+    //     load_tile(sprite, get_tile_addr(object.tileid, 1));
+    //     for (int j = 0; j<8; j++) {
+    //         for (int k=7; k>=0; k--) {
+    //             if ((sprite[j]>>(2*k))&3) {
+    //                 printf("%c", print_palette[get_object_palette(object.palette, (sprite[j]>>(2*k))&3)]);
+    //             } else {
+    //                 printf(" ");
+    //             }
+    //         }
+    //         printf("\n");   
+    //     }
+    // }
+
+
+    printf("Scanline %d. Found %d objects to draw!\n", *(ram+0xFF44), objects_found);
+    for (int i=0; i<objects_found; i++) {
+        uint16_t sprite[8];
+        load_tile(sprite, get_tile_addr(objects[i].tileid, 1));
+        for (int j = 0; j<8; j++) {
+            for (int k=7; k>=0; k--) {
+                if ((sprite[j]>>(2*k))&3) {
+                    printf("%c", print_palette[get_object_palette(objects[i].palette, (sprite[j]>>(2*k))&3)]);
+                } else {
+                    printf(" ");
+                }
+            }
+            printf("\n");   
+        }
+    }
+
+
+
 }
