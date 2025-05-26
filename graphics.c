@@ -349,7 +349,6 @@ void draw_objects(void) {
     /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
     if (((*(ram+0xFF40))&1) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
         uint16_t tiles[20][8];
-        memset(priority_object, 255, 160); // array priority_object will store the highest priority object to render per xvalue. Initialise to an invalid value
         for (int8_t i = objects_found; i >= 0; i--) {
             if ((*(ram+0xFF40))&4) { // object 8x16 mode
                 load_tile(tiles[2*i], get_tile_addr(objects[i].tileid&0xFE, 1)); // &0xFE force-resets lower bit
@@ -357,13 +356,8 @@ void draw_objects(void) {
             } else {
                 load_tile(tiles[i], get_tile_addr(objects[i].tileid, 1));
             }
-            for (uint16_t x = objects[i].xpos-8; x<objects[i].xpos; x++) {
-                priority_object[x] = i;
-            }
-        }
-        for (uint8_t screen_x=0; screen_x<160; screen_x++) {
-            if (priority_object[screen_x] != 255) {
-                ObjectAttribute target_object = objects[priority_object[screen_x]];
+            for (uint16_t screen_x = objects[i].xpos-8; screen_x<objects[i].xpos; screen_x++) {
+                ObjectAttribute target_object = objects[i];
                 uint8_t sprite_x = screen_x - (target_object.xpos-8);
                 if (!target_object.xflip) sprite_x = 7 - sprite_x;
                 uint8_t sprite_y = *(ram+0xFF44) - (target_object.ypos-16);
@@ -371,12 +365,12 @@ void draw_objects(void) {
                 if (target_object.yflip && ((*(ram+0xFF40))&4)) sprite_y = 15 - sprite_y;
                 uint16_t tile_line;
                 if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
-                    tile_line = tiles[priority_object[screen_x]][sprite_y];
+                    tile_line = tiles[i][sprite_y];
                 } else { // object 8x16 mode
                     if (sprite_y < 8) {
-                        tile_line = tiles[2*priority_object[screen_x]][sprite_y];
+                        tile_line = tiles[2*i][sprite_y];
                     }
-                        tile_line = tiles[2*priority_object[screen_x] + 1][sprite_y-8];
+                        tile_line = tiles[2*i + 1][sprite_y-8];
                 }
                 uint8_t pixel = (tile_line>>(2*sprite_x))&3;
                 if (pixel) { // skip if transparent
