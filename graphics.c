@@ -139,13 +139,11 @@ void key_pressed(unsigned char key, int x, int y) {
         LOOP = 0;
         break;
     default:
-        has_changed = 1;
+        has_changed = 0;
     }
     if (has_changed) {
         if (key != 27) fprintf(stderr, "Key Pressed (%c)\n", key);
         joypad_io();
-        bool old_state = *(ram+0xFF00)&0xF;
-        if (old_state > *(ram+0xFF00)&0xF) *(ram+0xFF0F) |= 16; // Request a VBlank interrupt
     }
 }
 
@@ -180,7 +178,7 @@ void key_released(unsigned char key, int x, int y) {
         joypad_state.select = 0;
         break;
     default:
-        has_changed = 1;
+        has_changed = 0;
     }
     if (has_changed) joypad_io();
 }

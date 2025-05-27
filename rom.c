@@ -170,7 +170,8 @@ void init_ram() {
     memcpy(ram, rom.rom, 0x8000);
 
     //various ram addrs
-    *(ram+0xFF44) = 0x90; // lack of lcd
+    *(ram+0xFF00) = 0xFF; // JOYP
+    *(ram+0xFF01) = 0x3F; // serial stub
 
     //*(ram+0xFF44) = 0b11100100; // bg pallette
 

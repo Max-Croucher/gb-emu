@@ -49,10 +49,9 @@ bool service_interrupts(void) {
             if (available_regs & 1<<isr) {
                 *(ram+0xFF0F) &= ~(uint8_t)(1<<isr); //disable IF
                 set_ime(0); //disable isr flag
-                set_isr_enable(isr, 0);
                 reg.SP-=2; //execute a CALL (push PC to stack)
                 write_word(reg.SP, reg.PC);
-                set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr addr
+                set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
                 return 1;
             }
         }
@@ -134,12 +133,12 @@ int main(int argc, char *argv[]) {
 
             if (!(system_counter&3)) {
                 if (!instruction_timeout) {
-                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d INTFLAGS:%.2x OPCODES: %s\n",
+                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d IE:%.2x IF:%.2x OPCODES: %s\n",
                     //     get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
                     //     get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
                     //     get_r16(R16SP),get_r16(R16PC),
                     //     *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                    //     reg.IME, halt_state, *(ram+0xFF0F),
+                    //     reg.IME, halt_state, *(ram+0xFFFF), *(ram+0xFF0F),
                     //     ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
                     // );
 

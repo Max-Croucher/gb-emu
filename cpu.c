@@ -320,6 +320,10 @@ uint8_t read_byte(uint16_t addr) {
     //     return *(ram+addr) | (write_masks[addr&0xFF]); // set unreadable bits high
     // }
 
+    if (addr == 0xFF00) { //reading joypad
+        joypad_io();
+        return *(ram+addr);
+    }
 
     return *(ram+addr);
 }
@@ -339,19 +343,38 @@ uint16_t read_word(uint16_t addr) {
 
 
 void joypad_io(void) {
-    switch ((*(ram+0xFF00)>>4)&3)
-    {
-    case 0:
-    case 3:
-        *(ram+0xFF00) |=0x0F;
-        break;
-    case 1:
-        *(ram+0xFF00) &=0xF0;
-        *(ram+0xFF00) |= (!joypad_state.down<<3) + (!joypad_state.up<<2) + (!joypad_state.left<<1) + (!joypad_state.right);
-        break;
-    case 2:
-        *(ram+0xFF00) &=0xF0;
-        *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
-        break;
+
+    uint8_t old_state = *(ram+0xFF00) & 0x0F;
+    *(ram+0xFF00) |=0x0F; // set lower nibble high (no buttons pushed)
+    if (!(*(ram+0xFF00)&32)) { // read SsBA
+        *(ram+0xFF00) &= ~((joypad_state.select<<3) + (joypad_state.start<<2) + (joypad_state.B<<1) + (joypad_state.A));
+    } 
+    if (!(*(ram+0xFF00)&16)) { // read dpad
+        *(ram+0xFF00) &= ~((joypad_state.down<<3) + (joypad_state.up<<2) + (joypad_state.left<<1) + (joypad_state.right));
     }
+    if (old_state & ~(*(ram+0xFF00) & 0x0F)) {// if any bits were high and are now low
+        *(ram+0xFF0F) |= 16; // Request a joypad interrupt
+    }
+
+
+    // switch ((*(ram+0xFF00)>>4)&3)
+    // {
+    // case 3:
+    //     *(ram+0xFF00) |=0x0F;
+    //     fprintf(stderr, "none\n");
+    //     break;
+    // case 2:
+    //     fprintf(stderr, "dpad\n");
+    //     *(ram+0xFF00) &=0xF0;
+    //     *(ram+0xFF00) |= (!joypad_state.down<<3) + (!joypad_state.up<<2) + (!joypad_state.left<<1) + (!joypad_state.right);
+    //     break;
+    // case 1:
+    //     fprintf(stderr, "face\n");
+    //     *(ram+0xFF00) &=0xF0;
+    //     *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
+    //     break;
+    // case 0:
+    //     fprintf(stderr, "face\n");
+        
+    // }
 }
