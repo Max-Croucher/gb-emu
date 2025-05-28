@@ -7,19 +7,7 @@
 #ifndef OPCODES_H
 #define OPCODES_H
 
-typedef struct
-{
-    uint8_t haltmode;
-    bool eiset;
-    uint16_t new_pc;
-    uint8_t machine_cycles;
-} InstructionResult;
 
-InstructionResult block00(uint8_t opcode);
-InstructionResult block01(uint8_t opcode);
-InstructionResult block10(uint8_t opcode);
-InstructionResult block11(uint8_t opcode);
-InstructionResult prefixCB(uint8_t opcode);
-InstructionResult run_instruction();
+void run_instruction();
 
 #endif // OPCODES_H
