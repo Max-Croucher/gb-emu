@@ -237,6 +237,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
     if (addr == 0xFF46) { // enter DMA mode
         if (byte < 0xE0) {
             *(ram+addr) = byte;
+            fprintf(stderr,  "Started DMA from addr 0x%.2x\n", byte);
             OAM_DMA = 1;
             OAM_DMA_timeout = 640;
         }
