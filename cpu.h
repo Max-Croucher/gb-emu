@@ -68,6 +68,7 @@ uint16_t get_r16(uint16_t regname);
 void set_r16(uint16_t regname, uint16_t value);
 bool is_cc(uint8_t cond);
 void set_ime(bool state);
+uint8_t decode_r16stk(uint8_t);
 void set_isr_enable(uint8_t isr_type, bool state);
 void write_byte(uint16_t addr, uint8_t byte);
 uint8_t read_byte(uint16_t addr);

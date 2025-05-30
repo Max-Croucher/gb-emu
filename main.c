@@ -39,6 +39,11 @@ extern gbRom rom;
 extern bool LOOP;
 extern bool OAM_DMA;
 extern uint16_t OAM_DMA_timeout;
+extern bool do_ei_set;
+extern uint8_t do_haltmode;
+extern void (*scheduled_instructions[10])(void);
+extern uint8_t num_scheduled_instructions;
+extern uint8_t current_instruction_count;
 
 
 bool service_interrupts(void) {
@@ -48,10 +53,8 @@ bool service_interrupts(void) {
         for (int isr=0; isr<5; isr++) { //Check for each of the 5 interrupts
             if (available_regs & 1<<isr) {
                 *(ram+0xFF0F) &= ~(uint8_t)(1<<isr); //disable IF
-                set_ime(0); //disable isr flag
-                reg.SP-=2; //execute a CALL (push PC to stack)
-                write_word(reg.SP, reg.PC);
-                set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
+                set_ime(0);
+                load_interrupt_instructions(isr);
                 return 1;
             }
         }
@@ -95,21 +98,19 @@ int main(int argc, char *argv[]) {
     init_ram();
     init_registers();
     init_graphics(&argc, argv);
-    InstructionResult instruction_result = {0,0,0,0};
     
     FILE *logfile;
 	logfile = fopen("cpu_states.log", "w");
-
-    bool do_ei = 0;
-    uint8_t halt_state = 0; //0 = no_halt, 1 = ime is on, 2 = no pending, 3 = pending
+    int8_t do_ei = 0;
+    bool halt_state = 0;
     bool stop_mode = 0;
-    uint8_t instruction_timeout = 0;
     uint64_t frames = 0;
+    bool debug_skip_state = 0;
 
     uint16_t count = 0;
     while (LOOP) {
         system_counter++;
-        //fprintf(stderr, "%d | %d | %d | %d\n", system_counter, instruction_timeout, halt_state, stop_mode);
+        //fprintf(stderr, "%d | (%d, %d) | %d | %d\n", system_counter, current_instruction_count, num_scheduled_instructions, halt_state, stop_mode);
         if (increment_timers()) {
             if (TIMA_oddity) {
                 TIMA_oddity = 0;
@@ -132,49 +133,49 @@ int main(int argc, char *argv[]) {
             }
 
             if (!(system_counter&3)) {
-                if (!instruction_timeout) {
-                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d IE:%.2x IF:%.2x OPCODES: %s\n",
+                if (current_instruction_count < num_scheduled_instructions) {
+                    scheduled_instructions[current_instruction_count]();
+                    current_instruction_count++;
+
+
+                    if (do_haltmode) { // HALT was called:
+                        if (do_haltmode == 2) {
+                            stop_mode = 1;
+                        } else {
+                            halt_state = 1;
+                        }
+                        do_haltmode = 0;
+                    }
+                    if (do_ei_set && (do_ei == 0)) {
+                        do_ei = 2;
+                        do_ei_set = 0;
+                    }
+
+
+                } else {
+                    if (do_ei > 0) {
+                        do_ei--;
+                        if (!do_ei)set_ime(1); // set EI late
+                    }
+
+                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d STOP:%d IE:%.2x IF:%.2x OPCODES: %s\n",
                     //     get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
                     //     get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
                     //     get_r16(R16SP),get_r16(R16PC),
                     //     *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                    //     reg.IME, halt_state, *(ram+0xFFFF), *(ram+0xFF0F),
+                    //     reg.IME, halt_state, stop_mode, *(ram+0xFFFF), *(ram+0xFF0F),
                     //     ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
                     // );
 
-                    if (halt_state == 2 && (*(ram+0xFF0F))) { //An interrupt is now pending to quit HALT
+                    if (halt_state && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
                         halt_state = 0;
-                    } else {
-                        if (service_interrupts()) {
-                            halt_state = 0; // clear halt state
-                            instruction_timeout = 5;
-                            continue;
-                        }
                     }
-                    if (halt_state == 0 || halt_state == 3) {
-                        instruction_result = run_instruction();
-                        if (halt_state == 3) halt_state = 0;
-                        if (do_ei) set_ime(1); // set EI late
+                    if (!halt_state) service_interrupts();
 
-                        if (instruction_result.haltmode) { // HALT was called:
-                            if (instruction_result.haltmode == 2) {
-                                stop_mode = 1;
-                            } else {
-                                if (reg.IME) {
-                                    halt_state = 1; // Halt until interrupt is executed
-                                } else if (*(ram+0xFF0F)&0x1F) {
-                                    halt_state = 3; // Resume, but do instruction twice
-                                } else {
-                                    halt_state = 2; // Halt until interrupt is requested
-                                }
-                            }
-                        }
-                        do_ei = instruction_result.eiset;
-                        instruction_timeout = instruction_result.machine_cycles;
-                        reg.PC = instruction_result.new_pc;
+                    if ((!halt_state) && (current_instruction_count >= num_scheduled_instructions)) {
+                        queue_instruction();
                     }
                 }
-                instruction_timeout -= 1;
             }
             frames += tick_graphics();
             //usleep(10);

@@ -172,8 +172,10 @@ void init_ram() {
     //various ram addrs
     *(ram+0xFF00) = 0xFF; // JOYP
     *(ram+0xFF01) = 0x3F; // serial stub
+    *(ram+0xFF40) = 0x91; // lcdc init
+    *(ram+0xFF44) = 0x90; // lcd stub
 
-    //*(ram+0xFF44) = 0b11100100; // bg pallette
+    //*(ram+0xFF47) = 0b11100100; // bg pallette
 
     // uint8_t initial_registers[128] = {
     //     0xFF, 0x00, 0x7E, 0xFF, 0xFF, 0x00, 0x00, 0xF8, // 0xFF00

@@ -173,6 +173,9 @@ void set_r16(uint16_t regname, uint16_t value) {
     case R16PC:
         reg.PC = value;
         break;
+    case R16AF:
+        reg.AF = value & 0xFFF0;
+        break;
     }
 }
 
@@ -325,6 +328,8 @@ uint8_t read_byte(uint16_t addr) {
         joypad_io();
         return *(ram+addr);
     }
+
+    if (addr == 0xFF4D) return 0xFF; //KEY0 in DMG mode
 
     return *(ram+addr);
 }
