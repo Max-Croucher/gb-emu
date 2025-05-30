@@ -20,7 +20,7 @@ typedef struct {
 void init_screen_tex(void);
 void gl_tick(void);
 void reshape(int w, int h);
-void init_graphics(int *argc, char *argv[]);
+void init_graphics(int *argc, char *argv[], char rom_title[16]);
 void window_closed(void);
 void key_pressed (unsigned char key, int x, int y);
 void key_released (unsigned char key, int x, int y);

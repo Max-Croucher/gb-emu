@@ -15,6 +15,9 @@
 extern Registers reg;
 extern uint8_t* ram;
 extern uint16_t system_counter;
+extern bool halt_on_breakpoint;
+extern bool print_breakpoints;
+extern bool LOOP;
 bool do_ei_set = 0; //extern
 uint8_t do_haltmode = 0; //extern
 void (*scheduled_instructions[10])(void); //extern
@@ -784,15 +787,12 @@ static void instr_invalid(void) {
 static void instr_ld_r8_r8(void) {
     /* load into register r8 from register r */
     if (((read_byte(reg.PC)>>3)&7) == R8B && (read_byte(reg.PC)&7) == R8B) {
-        //breakpoint
-        if (reg.BC == 0x0305 && reg.DE == 0x080d && reg.HL == 0x1522) { //MTS Success
-            printf("BREAKPOINT SUCCESS B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
-            //exit(EXIT_SUCCESS);
-        } else if (reg.BC == 0x4242 && reg.DE == 0x4242 && reg.HL == 0x4242) { //MTS Failure
-            printf("BREAKPOINT FAILURE B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
-            //exit(EXIT_FAILURE);
-        } else {
-            printf("BREAKPOINT UNKNOWN B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+        if (reg.BC == 0x0305 && reg.DE == 0x080d && reg.HL == 0x1522) { //Mooneye Success
+            if (halt_on_breakpoint || print_breakpoints) printf("BREAKPOINT SUCCESS B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            if (halt_on_breakpoint) LOOP = 0;
+        } else if (reg.BC == 0x4242 && reg.DE == 0x4242 && reg.HL == 0x4242) { //Mooneye Failure
+            if (halt_on_breakpoint || print_breakpoints) printf("BREAKPOINT FAILURE B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            if (halt_on_breakpoint) LOOP = 0;
         }
     }
 

@@ -48,7 +48,7 @@ void print_registers(void) {
 
 bool get_flag(uint8_t flagname) {
     /* get the state associated with the given flag */
-    return ((((uint8_t)1<<flagname) & (uint8_t)reg.AF))&&1;
+    return ((((uint8_t)1<<flagname) & (uint8_t)reg.AF));
 }
 
 
@@ -240,7 +240,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
     if (addr == 0xFF46) { // enter DMA mode
         if (byte < 0xE0) {
             *(ram+addr) = byte;
-            fprintf(stderr,  "Started DMA from addr 0x%.2x\n", byte);
+            //fprintf(stderr,  "Started DMA from addr 0x%.2x\n", byte);
             OAM_DMA = 1;
             OAM_DMA_timeout = 640;
         }

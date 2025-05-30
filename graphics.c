@@ -15,29 +15,68 @@
 #include "graphics.h"
 
 extern uint8_t* ram;
+extern uint8_t* rom;
 extern JoypadState joypad_state;
 extern bool LOOP;
+extern bool hyperspeed;
 
 clock_t start,end;
-
-double frametime = 0;
+double rolling_frametime = 0;
 uint8_t framecount_offset = 0;
+uint8_t frame_report_offset = 0;
 #define FRAMETIME_BUFSIZE 10
+#define TARGET_FRAMETIME 0.016742706
+#define FRAMETIME_REPORT_INTERVAL 12
+double calibrated_frametime = TARGET_FRAMETIME;
 
+char rom_name[16];
+char window_name[32];
 uint8_t xoffset = 0;
 static uint32_t dot = 0;
 uint8_t window_internal_counter = 0;
-
 GLubyte texture[144][160][3];
 ObjectAttribute objects[10];
 uint8_t objects_found = 0;
-
 uint8_t pixvals[5] = {0xF8, 0xA0, 0x50, 0x00, 0xFF};
 uint8_t priority_object[160];
-
 bool old_stat_state = 0;
-
 bool lcd_enable = 0;
+
+
+void framerate(void) {
+    /* run at the start of VBLANK to compute framerate and add delay to target 59.73Hz */
+    double raw_frametime = ((double)(clock()-start)) / CLOCKS_PER_SEC;
+    if (!hyperspeed) {
+        double catchup = calibrated_frametime - raw_frametime;
+        struct timespec waittime;
+        waittime.tv_sec = 0;
+        waittime.tv_nsec = (long int)(1000000000 * catchup);
+        //fprintf(stderr, "before: %.6f\n", raw_frametime);
+        //fprintf(stderr, "wait:   %.6f\n", catchup);
+        nanosleep(&waittime, &waittime);
+        raw_frametime = catchup + ((double)(clock()-start)) / CLOCKS_PER_SEC;
+        //fprintf(stderr, "after:  %.6f\n\n", raw_frametime);
+    }
+
+    rolling_frametime += raw_frametime;
+    framecount_offset++;
+    if (framecount_offset == FRAMETIME_BUFSIZE) {
+        framecount_offset = 0;
+        if (frame_report_offset == FRAMETIME_REPORT_INTERVAL) {
+            frame_report_offset = 0;
+            sprintf(window_name, "%s | %.1fHz", rom_name, 1.0/(rolling_frametime/FRAMETIME_BUFSIZE));
+            glutSetWindowTitle(window_name);
+        }
+        frame_report_offset++;
+        if (!hyperspeed) {
+            double frametime_error = TARGET_FRAMETIME - rolling_frametime/FRAMETIME_BUFSIZE;
+            calibrated_frametime += frametime_error/2;
+        }
+        rolling_frametime = 0;
+    }
+    start = clock();
+}
+
 
 void init_screen_tex(void) {
     glEnable(GL_TEXTURE_2D);
@@ -78,13 +117,14 @@ void reshape_window(int w, int h) {
 }
 
 
-void init_graphics(int *argc, char *argv[]) {
+void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     /* Main init procedure for graphics */
     glutInit(argc,argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
     glutInitWindowSize(320,288);
     glutInitWindowPosition(100,100);
-    glutCreateWindow("GB Emu");
+    memcpy(rom_name, rom_title, 16);
+    glutCreateWindow(rom_name);
     glClearColor(0.0,0.0,0.0,0.0);
     glShadeModel(GL_FLAT);
     glutDisplayFunc(gl_tick);
@@ -256,10 +296,10 @@ void read_objects(void) {
                 .ypos = ypos,
                 .xpos = *(ram+0xFE00+(i*4)+1),
                 .tileid = *(ram+0xFE00+(i*4)+2),
-                .priority = flags & (1<<7),
-                .yflip = flags & (1<<6),
-                .xflip = flags & (1<<5),
-                .palette = flags & (1<<4)
+                .priority = (bool)(flags & (1<<7)),
+                .yflip = (bool)(flags & (1<<6)),
+                .xflip = (bool)(flags & (1<<5)),
+                .palette = (bool)(flags & (1<<4))
             };
             objects_found++;
         }
@@ -367,8 +407,9 @@ void draw_objects(void) {
                 } else { // object 8x16 mode
                     if (sprite_y < 8) {
                         tile_line = tiles[2*i][sprite_y];
-                    }
+                    } else {
                         tile_line = tiles[2*i + 1][sprite_y-8];
+                    }
                 }
                 uint8_t pixel = (tile_line>>(2*sprite_x))&3;
                 if (pixel) { // skip if transparent
@@ -408,7 +449,7 @@ bool tick_graphics(void) {
         (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
     );
     if ((old_stat_state == 0) && current_stat_state) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
-    old_stat_state == current_stat_state;
+    old_stat_state = current_stat_state;
 
     if (lcd_enable) {
         if (dot == 65564) { // enter VBLANK
@@ -422,16 +463,7 @@ bool tick_graphics(void) {
             glutPostRedisplay();
             //print_tilemaps();
             //print_sprites();
-            end = clock();
-            frametime += ((double)(end-start)) / CLOCKS_PER_SEC;
-            framecount_offset++;
-            if (framecount_offset == (FRAMETIME_BUFSIZE-1)) {
-                framecount_offset = 0;
-                fprintf(stderr, "framerate: %.2fHz\n", 1.0/(frametime/FRAMETIME_BUFSIZE));
-                frametime = 0;
-            }
-            //fprintf(stderr,"framerate: %.2fHz\n", 1.0/(frametime/10));
-            start = clock();
+            framerate();
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 2; // set ppu mode to 2

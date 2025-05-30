@@ -34,6 +34,17 @@ Notes:
 bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
 uint16_t system_counter = 0xABCE; //extern
+FILE *logfile;
+int8_t do_ei = 0;
+bool halt_state = 0;
+bool stop_mode = 0;
+
+bool halt_on_breakpoint = 0; //extern
+bool print_breakpoints = 0; //extern
+bool hyperspeed = 0;
+bool no_display = 0;
+bool verbose_logging = 0;
+
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
@@ -44,6 +55,18 @@ extern uint8_t do_haltmode;
 extern void (*scheduled_instructions[10])(void);
 extern uint8_t num_scheduled_instructions;
 extern uint8_t current_instruction_count;
+
+
+void decode_launch_args(int argc, char *argv[]) {
+    /* read argv to set launch arguments */
+    for (int i=2; i<argc; i++) {
+        if (!strcmp(argv[i], "--halt-on-breakpoints")) halt_on_breakpoint = 1;
+        if (!strcmp(argv[i], "--print-breakpoints")) print_breakpoints = 1;
+        if (!strcmp(argv[i], "--max-speed")) hyperspeed = 1;
+        if (!strcmp(argv[i], "--windowless")) no_display = 1;
+        if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
+    }
+}
 
 
 bool service_interrupts(void) {
@@ -95,19 +118,14 @@ bool increment_timers() {
 
 int main(int argc, char *argv[]) {
     load_rom(argv[1]);
+    decode_launch_args(argc, argv);
     init_ram();
     init_registers();
-    init_graphics(&argc, argv);
-    
-    FILE *logfile;
-	logfile = fopen("cpu_states.log", "w");
-    int8_t do_ei = 0;
-    bool halt_state = 0;
-    bool stop_mode = 0;
-    uint64_t frames = 0;
-    bool debug_skip_state = 0;
+    if (!no_display) init_graphics(&argc, argv, rom.title);
+    if (verbose_logging) {
+        logfile = fopen("cpu_states.log", "w");
+    }
 
-    uint16_t count = 0;
     while (LOOP) {
         system_counter++;
         //fprintf(stderr, "%d | (%d, %d) | %d | %d\n", system_counter, current_instruction_count, num_scheduled_instructions, halt_state, stop_mode);
@@ -139,14 +157,14 @@ int main(int argc, char *argv[]) {
                         if (!do_ei)set_ime(1); // set EI late
                     }
 
-                    // fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d STOP:%d IE:%.2x IF:%.2x OPCODES: %s\n",
-                    //     get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
-                    //     get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
-                    //     get_r16(R16SP),get_r16(R16PC),
-                    //     *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                    //     reg.IME, halt_state, stop_mode, *(ram+0xFFFF), *(ram+0xFF0F),
-                    //     ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
-                    // );
+                    if (verbose_logging) fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d STOP:%d IE:%.2x IF:%.2x OPCODES: %s\n",
+                        get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
+                        get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
+                        get_r16(R16SP),get_r16(R16PC),
+                        *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
+                        reg.IME, halt_state, stop_mode, *(ram+0xFFFF), *(ram+0xFF0F),
+                        ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
+                    );
 
                     if (halt_state && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
                         halt_state = 0;
@@ -176,20 +194,20 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            frames += tick_graphics();
+            if (!no_display) tick_graphics();
             //usleep(10);
         }
     }
-    if (!LOOP) fprintf(stderr, "Exiting (keypress).\n");
-    fprintf(stderr,"Processed %ld frames.\n", frames);
 
     //write ram contents to a file
-    FILE *f;
-	f = fopen("ram_contents.hex", "wb");
-    fwrite(ram, 1, 0x10000, f);
-    fprintf(stderr, "written RAM to 'ram_contents.hex'.\n");
-    fclose(f);
-    fclose(logfile);
+    if (verbose_logging) {
+        FILE *f;
+        f = fopen("ram_contents.hex", "wb");
+        fwrite(ram, 1, 0x10000, f);
+        fprintf(stderr, "written RAM to 'ram_contents.hex'.\n");
+        fclose(f);
+        fclose(logfile);
+    }
 
     //free mallocs
     free(rom.rom);

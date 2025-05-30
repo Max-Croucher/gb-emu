@@ -6,6 +6,9 @@
 
 #ifndef REGISTERS_H
 #define REGISTERS_H
+
+#include <stdint.h>
+
 uint8_t write_masks[256] = { // for each byte, a '1' means a bit is writable
     0b00110000, // JOYP
     0b11111111, // SB
@@ -15,14 +18,14 @@ uint8_t write_masks[256] = { // for each byte, a '1' means a bit is writable
     0b11111111, // TIMA
     0b11111111, // TMA
     0b11111111, // TAC
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
     0b11111111, // IF
-    0b00000000,
-    0b00000000,
-    0b00000000,
-    0b00000000,
-    0b00000000,
-    0b00000000,
-    0b00000000,
     0b01111111, // NR10
     0b11111111, // NR11
     0b11111111, // NR12
@@ -121,7 +124,7 @@ uint8_t write_masks[256] = { // for each byte, a '1' means a bit is writable
     0b00000000,
     0b00000000,
     0b00000000,
-    0b11111111, // ???
+    0b00000000,
     0b11111111, // ???
     0b00000000,
     0b01110000, // ???
@@ -274,14 +277,14 @@ uint8_t read_masks[256] = { // for each byte, a '0' means a bit is readable
     0b00000000, // TIMA
     0b00000000, // TMA
     0b00000000, // TAC
+    0b11111111,
+    0b11111111,
+    0b11111111,
+    0b11111111,
+    0b11111111,
+    0b11111111,
+    0b11111111,
     0b00000000, // IF
-    0b11111111,
-    0b11111111,
-    0b11111111,
-    0b11111111,
-    0b11111111,
-    0b11111111,
-    0b11111111,
     0b10000000, // NR10
     0b00111111, // NR11
     0b00000000, // NR12
@@ -380,7 +383,7 @@ uint8_t read_masks[256] = { // for each byte, a '0' means a bit is readable
     0b11111111,
     0b11111111,
     0b11111111,
-    0b00000000, // ???
+    0b11111111,
     0b00000000, // ???
     0b11111111,
     0b10001111, // ???
