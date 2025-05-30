@@ -33,7 +33,7 @@ Notes:
 
 bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
-uint16_t system_counter = 0xABD6; //extern
+uint16_t system_counter = 0xABCE; //extern
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
@@ -133,26 +133,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (!(system_counter&3)) {
-                if (current_instruction_count < num_scheduled_instructions) {
-                    scheduled_instructions[current_instruction_count]();
-                    current_instruction_count++;
-
-
-                    if (do_haltmode) { // HALT was called:
-                        if (do_haltmode == 2) {
-                            stop_mode = 1;
-                        } else {
-                            halt_state = 1;
-                        }
-                        do_haltmode = 0;
-                    }
-                    if (do_ei_set && (do_ei == 0)) {
-                        do_ei = 2;
-                        do_ei_set = 0;
-                    }
-
-
-                } else {
+                if (current_instruction_count == num_scheduled_instructions) {
                     if (do_ei > 0) {
                         do_ei--;
                         if (!do_ei)set_ime(1); // set EI late
@@ -172,8 +153,26 @@ int main(int argc, char *argv[]) {
                     }
                     if (!halt_state) service_interrupts();
 
-                    if ((!halt_state) && (current_instruction_count >= num_scheduled_instructions)) {
+                    if ((!halt_state) && (current_instruction_count == num_scheduled_instructions)) {
                         queue_instruction();
+                    }
+                }
+
+                if (!halt_state) {
+                    scheduled_instructions[current_instruction_count]();
+                    current_instruction_count++;
+
+                    if (do_haltmode) { // HALT was called:
+                        if (do_haltmode == 2) {
+                            stop_mode = 1;
+                        } else {
+                            halt_state = 1;
+                        }
+                        do_haltmode = 0;
+                    }
+                    if (do_ei_set && (do_ei == 0)) {
+                        do_ei = 2;
+                        do_ei_set = 0;
                     }
                 }
             }

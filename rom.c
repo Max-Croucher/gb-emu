@@ -172,6 +172,7 @@ void init_ram() {
     //various ram addrs
     *(ram+0xFF00) = 0xFF; // JOYP
     *(ram+0xFF01) = 0x3F; // serial stub
+    *(ram+0xFF01) = 0xFF; // SC
     *(ram+0xFF40) = 0x91; // lcdc init
     *(ram+0xFF44) = 0x90; // lcd stub
 

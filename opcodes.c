@@ -145,7 +145,6 @@ static void machine_load_addr_low_imm8(void) {
     reg.PC++;
     addr &= 0xFF00;
     addr |= read_byte(reg.PC);
-
 }
 
 
@@ -778,11 +777,26 @@ static void instr_nop(void) {
 static void instr_invalid(void) {
     /* crash */
     fprintf(stderr, "Error: Encountered an invalid opcode (0x%.2x)\n", read_byte(reg.PC));
+    exit(EXIT_FAILURE);
 }
 
 
 static void instr_ld_r8_r8(void) {
     /* load into register r8 from register r */
+    if (((read_byte(reg.PC)>>3)&7) == R8B && (read_byte(reg.PC)&7) == R8B) {
+        //breakpoint
+        if (reg.BC == 0x0305 && reg.DE == 0x080d && reg.HL == 0x1522) { //MTS Success
+            printf("BREAKPOINT SUCCESS B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            //exit(EXIT_SUCCESS);
+        } else if (reg.BC == 0x4242 && reg.DE == 0x4242 && reg.HL == 0x4242) { //MTS Failure
+            printf("BREAKPOINT FAILURE B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            //exit(EXIT_FAILURE);
+        } else {
+            printf("BREAKPOINT UNKNOWN B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+        }
+    }
+
+
     scheduled_instructions[0] = &machine_load_r8_r8;
     num_scheduled_instructions = 1;
 }
