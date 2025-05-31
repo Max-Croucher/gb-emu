@@ -42,7 +42,7 @@ static void (*instructions[256])(void) = {
     &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x40
     &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x50
     &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x60
-    &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_halt,            &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x70
+    &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_halt,            &instr_ld_hl_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x70
     &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_hl,        &instr_add_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_hl,        &instr_adc_a_r8,    //0x80
     &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_hl,        &instr_sub_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_hl,        &instr_sbc_a_r8,    //0x90
     &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_hl,        &instr_and_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_hl,        &instr_xor_a_r8,    //0xA0
@@ -862,8 +862,8 @@ static void instr_ld_hl_r8(void) {
     /* load into byte pointed to by hl from register r8 */
     r8 = read_byte(reg.PC)&7;
     addr = reg.HL;
-    scheduled_instructions[0] = &machine_load_Z_r8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
+    scheduled_instructions[0] = &machine_load_addr_r8;
+    scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
 
@@ -914,8 +914,8 @@ static void instr_ld_imm16_a(void) {
     r8 = R8A;
     scheduled_instructions[0] = &machine_load_addr_low_imm8;
     scheduled_instructions[1] = &machine_load_addr_high_imm8;
-    scheduled_instructions[2] = &machine_load_Z_r8;
-    scheduled_instructions[3] = &machine_load_addr_Z;
+    scheduled_instructions[2] = &machine_load_addr_r8;
+    scheduled_instructions[3] = &machine_nop;
     num_scheduled_instructions = 4;
 }
 
@@ -934,8 +934,8 @@ static void instr_ldh_c_a(void) {
     /* load into the byte in 0xFF00 + C from register A */
     r8 = R8A;
     addr = 0xFF00 + get_r8(R8C);
-    scheduled_instructions[0] = &machine_load_Z_r8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
+    scheduled_instructions[0] = &machine_load_addr_r8;
+    scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
 
@@ -956,8 +956,8 @@ static void instr_ldh_imm8_a(void) {
     r8 = R8A;
     addr = 0xFF00;
     scheduled_instructions[0] = &machine_load_addr_low_imm8;
-    scheduled_instructions[1] = &machine_load_Z_r8;
-    scheduled_instructions[2] = &machine_load_addr_Z;
+    scheduled_instructions[1] = &machine_load_addr_r8;
+    scheduled_instructions[2] = &machine_nop;
     num_scheduled_instructions = 3;
 }
 
@@ -978,8 +978,8 @@ static void instr_ld_hl_a_minus(void) {
     r8 = R8A;
     addr = reg.HL;
     reg.HL--;
-    scheduled_instructions[0] = &machine_load_Z_r8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
+    scheduled_instructions[0] = &machine_load_addr_r8;
+    scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
 
@@ -1000,8 +1000,8 @@ static void instr_ld_hl_a_plus(void) {
     r8 = R8A;
     addr = reg.HL;
     reg.HL++;
-    scheduled_instructions[0] = &machine_load_Z_r8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
+    scheduled_instructions[0] = &machine_load_addr_r8;
+    scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
 
