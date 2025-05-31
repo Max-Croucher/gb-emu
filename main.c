@@ -33,7 +33,6 @@ Notes:
 
 bool TIMA_oddity = 0; //extern
 uint8_t* ram; //extern
-uint16_t system_counter = 0xABCE; //extern
 FILE *logfile;
 int8_t do_ei = 0;
 bool halt_state = 0;
@@ -45,6 +44,7 @@ bool hyperspeed = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
 
+extern uint16_t system_counter;
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
@@ -86,36 +86,6 @@ bool service_interrupts(void) {
 }
 
 
-bool increment_timers() {
-    /* Handle the incrementing and overflowing of timers */
-    uint8_t TAC = *(ram+0xFF07);
-    bool trigger = 0;
-    bool do_interrupt = 0;
-    if (TAC&4) { // Is timer enabled
-        switch (TAC&3) // Select timer speed
-        {
-        case 0: //4096 Hz
-            if (!(system_counter&0x03FF)) {(*(ram+0xFF05))++; trigger=1;}
-            break;
-        case 3: //16384 Hz
-            if (!(system_counter&0x00FF)) {(*(ram+0xFF05))++; trigger=1;}
-            break;
-        case 2: //65536 Hz
-            if (!(system_counter&0x003F)) {(*(ram+0xFF05))++; trigger=1;}
-            break;
-        case 1: //262144 Hz
-            if (!(system_counter&0x000F)) {(*(ram+0xFF05))++; trigger=1;}
-            break;
-        }
-        //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
-        if (trigger && !*(ram+0xFF05)) { //TIMA overflows
-            do_interrupt = 1;
-        }
-    }
-    return do_interrupt;
-}
-
-
 int main(int argc, char *argv[]) {
     load_rom(argv[1]);
     decode_launch_args(argc, argv);
@@ -127,16 +97,8 @@ int main(int argc, char *argv[]) {
     }
 
     while (LOOP) {
-        system_counter++;
         //fprintf(stderr, "%d | (%d, %d) | %d | %d\n", system_counter, current_instruction_count, num_scheduled_instructions, halt_state, stop_mode);
-        if (increment_timers()) {
-            if (TIMA_oddity) {
-                TIMA_oddity = 0;
-            } else {
-                *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
-                *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
-            }
-        }
+        increment_timers();
         if (stop_mode) {
             if ((*(ram+0xFF00)&0xF) != 0xF) stop_mode = 0; 
         } else {
@@ -175,6 +137,13 @@ int main(int argc, char *argv[]) {
                         queue_instruction();
                     }
                 }
+
+                // printf("count %d/%d | sysclk=0x%.4x", current_instruction_count, num_scheduled_instructions, system_counter);
+                // if (current_instruction_count == 0) {
+                //     printf(" | INSTR=%s\n\n", ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))]));
+                // } else {
+                //     printf("\n\n");
+                // }
 
                 if (!halt_state) {
                     scheduled_instructions[current_instruction_count]();

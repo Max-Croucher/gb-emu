@@ -58,6 +58,7 @@ typedef struct {
 #define ISR_SERIAL 3
 #define ISR_JOYPAD 4
 
+void increment_timers(void);
 void init_registers(void);
 void print_registers();
 bool get_flag(uint8_t flagname);

@@ -18,6 +18,9 @@ Registers reg; //extern
 bool LOOP = 1; //extern
 bool OAM_DMA = 0; //extern
 uint16_t OAM_DMA_timeout = 0; //extern
+uint16_t system_counter = 0xABCE; //extern
+bool do_div_reset;
+uint16_t div_reset_old_sysclk;
 extern uint16_t system_counter;
 extern void (*write_MBANK_register)(uint16_t, uint8_t);
 extern uint8_t (*read_rom)(uint32_t);
@@ -27,6 +30,50 @@ extern uint8_t (*read_ext_ram)(uint16_t);
 extern bool TIMA_oddity;
 extern uint8_t* ram;
 extern gbRom rom;
+
+void increment_timers(void) {
+    /* Handle the incrementing and overflowing of timers */
+    uint16_t fallen_bits;
+    if (do_div_reset) {
+        fallen_bits = div_reset_old_sysclk;
+        do_div_reset = 0;
+    } else {
+        fallen_bits = system_counter & (~(++system_counter)); // find all bits that are high in the pre-incremented sysclk, but low after incrementing
+    }
+    uint8_t TAC = *(ram+0xFF07);
+    bool trigger = 0;
+    bool do_interrupt = 0;
+    if (TAC&4) { // Is timer enabled
+        switch (TAC&3) // Select timer speed
+        {
+        case 0: //4096 Hz
+            if ((fallen_bits>>9)&1) {(*(ram+0xFF05))++; trigger=1;}
+            break;
+        case 3: //16384 Hz
+            if ((fallen_bits>>7)&1) {(*(ram+0xFF05))++; trigger=1;}
+            break;
+        case 2: //65536 Hz
+            if ((fallen_bits>>5)&1) {(*(ram+0xFF05))++; trigger=1;}
+            break;
+        case 1: //262144 Hz
+            if ((fallen_bits>>3)&1) {(*(ram+0xFF05))++; trigger=1;}
+            break;
+        }
+        //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
+        if (trigger && !*(ram+0xFF05)) { //TIMA overflows
+            do_interrupt = 1;
+        }
+    }
+    if (do_interrupt) {
+        if (TIMA_oddity) {
+            TIMA_oddity = 0;
+        } else {
+            *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
+            *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
+        }
+    }
+}
+
 
 void init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
@@ -271,7 +318,14 @@ void write_byte(uint16_t addr, uint8_t byte) {
         joypad_io();
         return;
     }
-    if (addr == 0xFF04) system_counter &= 0x00FF; //writing to DIV sets it to 0. preserve lower 4 bits?
+    if (addr == 0xFF04) { //writing to DIV sets it to 0, but requires special timer behaviour
+        printf("Reset DIV\n");
+        div_reset_old_sysclk=system_counter;
+        system_counter = 0;
+        do_div_reset=1;
+        increment_timers();
+        return;
+    }
     //strange TIMA behaviour
     if (addr == 0xFF05) { //TIMA 
         if (!*(ram+addr)) {
@@ -319,7 +373,7 @@ uint8_t read_byte(uint16_t addr) {
 
     if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
-    if (addr == 0xFF04) return system_counter>>8; //reading DIV
+    if (addr == 0xFF04) { printf("DIV=0x%.8x\n", system_counter); return system_counter>>8;} //reading DIV
     // if (addr > 0xFF00) { //Special instructions
     //     return *(ram+addr) | (write_masks[addr&0xFF]); // set unreadable bits high
     // }

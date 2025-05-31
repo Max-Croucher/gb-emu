@@ -17,6 +17,7 @@ typedef struct {
     bool palette;
 } ObjectAttribute;
 
+void framerate(void);
 void init_screen_tex(void);
 void gl_tick(void);
 void reshape(int w, int h);

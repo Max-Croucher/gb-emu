@@ -53,6 +53,7 @@ static void (*instructions[256])(void) = {
     &instr_ldh_a_imm8,      &instr_pop_r16,         &instr_ldh_a_c,         &instr_di,              &instr_invalid,         &instr_push_r16,        &instr_or_a_imm8,       &instr_rst,             &instr_ld_hl_sp_e,      &instr_ld_sp_hl,        &instr_ld_a_imm16,      &instr_ei,              &instr_invalid,         &instr_invalid,         &instr_cmp_a_imm8,      &instr_rst          //0xF0
 };
 
+
 static void (*prefixed_instructions[256])(void) = {
 /*  0x00                    0x01                    0x02                    0x03                    0x04                    0x05                    0x06                    0x07                    0x08                    0x09                    0x0A                    0x0B                    0x0C                    0x0D                    0x0E                    0x0F*/
     &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_hl,          &instr_rlc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_hl,          &instr_rrc_r8,      //0x00
@@ -73,6 +74,36 @@ static void (*prefixed_instructions[256])(void) = {
     &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8       //0xF0
 };
 
+
+void queue_instruction(void) {
+    /* read the opcode at the PC and queue an instruction's atomic instructions */
+    uint8_t opcode = read_byte(get_r16(R16PC));
+
+    if (opcode == 0xCB) {
+        (prefixed_instructions[read_byte(get_r16(R16PC)+1)])();
+    } else {
+        (instructions[opcode])();
+    }
+    current_instruction_count = 0;
+}
+
+
+void load_interrupt_instructions(uint8_t isr) {
+    /* load the atomic instructions that execute during interrupt handling */
+    r16 = R16PC;
+    addr = 0x40+(isr<<3);
+    scheduled_instructions[0] = &machine_idle;
+    scheduled_instructions[1] = &machine_dec_sp;
+    scheduled_instructions[2] = &machine_push_r16_high_dec_sp;
+    scheduled_instructions[3] = &machine_push_r16_low;
+    scheduled_instructions[4] = &machine_set_pc_addr;
+    num_scheduled_instructions = 5;
+    current_instruction_count = 0;
+    // set_ime(0); //disable isr flag
+    // reg.SP-=2; //execute a CALL (push PC to stack)
+    // write_word(reg.SP, reg.PC);
+    // set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
+}
 
 
 static void machine_nop(void) {
@@ -125,8 +156,14 @@ static void machine_load_r8_Z(void) {
 
 
 static void machine_load_Z_r8(void) {
-    /*load into Z from register r8 */
+    /* load into Z from register r8 */
     Z = get_r8(r8);
+}
+
+
+static void machine_load_addr_r8(void) {
+    /* load into byte pointed to by addr from r8 */
+    write_byte(addr, get_r8(r8));
 }
 
 
@@ -156,7 +193,6 @@ static void machine_load_addr_high_imm8(void) {
     reg.PC++;
     addr &= 0x00FF;
     addr |= ((read_byte(reg.PC)<<8));
-
 }
 
 
@@ -240,6 +276,7 @@ static void machine_inc_r16(void) {
     /* increment r18 */
     set_r16(r16, get_r16(r16)+1);
 }
+
 
 static void machine_inc_Z(void) {
     /* increment Z */
@@ -342,6 +379,7 @@ static void machine_add_l_r16l(void) {
     set_r8(R8L, get_r8(R8L) + byte);
     working_bit = byte > get_r8(R8L);
 }
+
 
 static void machine_add_h_r16h(void) {
     /* add h and the carry from r16 low to r16 high and save to h */
@@ -770,6 +808,7 @@ static void machine_set_pc_addr(void) {
 
 /*************************************************************************************************************************************************************/
 
+
 static void instr_nop(void) {
     /* do nothing */
     scheduled_instructions[0] = &machine_nop;
@@ -788,15 +827,13 @@ static void instr_ld_r8_r8(void) {
     /* load into register r8 from register r */
     if (((read_byte(reg.PC)>>3)&7) == R8B && (read_byte(reg.PC)&7) == R8B) {
         if (reg.BC == 0x0305 && reg.DE == 0x080d && reg.HL == 0x1522) { //Mooneye Success
-            if (halt_on_breakpoint || print_breakpoints) printf("BREAKPOINT SUCCESS B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            if (halt_on_breakpoint || print_breakpoints) fprintf(stderr, "BREAKPOINT SUCCESS B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
             if (halt_on_breakpoint) LOOP = 0;
         } else if (reg.BC == 0x4242 && reg.DE == 0x4242 && reg.HL == 0x4242) { //Mooneye Failure
-            if (halt_on_breakpoint || print_breakpoints) printf("BREAKPOINT FAILURE B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
+            if (halt_on_breakpoint || print_breakpoints) fprintf(stderr, "BREAKPOINT FAILURE B/C/D/E/H/L = %.2x/%.2x/%.2x/%.2x/%.2x/%.2x\n", get_r8(R8B), get_r8(R8C), get_r8(R8D), get_r8(R8E), get_r8(R8H), get_r8(R8L));
             if (halt_on_breakpoint) LOOP = 0;
         }
     }
-
-
     scheduled_instructions[0] = &machine_load_r8_r8;
     num_scheduled_instructions = 1;
 }
@@ -855,8 +892,8 @@ static void instr_ld_r16_A(void) {
     /* load into byte pointed to by r16 from A */
     addr = get_r16((read_byte(reg.PC)>>4)&3);
     r8 = R8A;
-    scheduled_instructions[0] = &machine_load_Z_r8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
+    scheduled_instructions[0] = &machine_load_addr_r8;
+    scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
 
@@ -1311,7 +1348,6 @@ static void instr_inc_r16(void) {
     scheduled_instructions[0] = &machine_inc_r16;
     scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
-
 }
 
 
@@ -1321,7 +1357,6 @@ static void instr_dec_r16(void) {
     scheduled_instructions[0] = &machine_dec_r16;
     scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
-
 }
 
 
@@ -1581,6 +1616,7 @@ static void instr_set_hl(void) {
     num_scheduled_instructions = 4;
 }
 
+
 static void instr_jp_imm16(void) {
     /* unconditional jump to imm16 */
     r16 = R16PC;
@@ -1616,7 +1652,6 @@ static void instr_jp_cc_imm16(void) {
         scheduled_instructions[2] = &machine_nop;
         num_scheduled_instructions = 3;
     }
-
 }
 
 
@@ -1627,7 +1662,6 @@ static void instr_jr_imm8(void) {
     scheduled_instructions[1] = &machine_add_WZ_r16_Z_1;
     scheduled_instructions[2] = &machine_load_r16_WZ;
     num_scheduled_instructions = 3;
-    
 }
 
 
@@ -1644,7 +1678,6 @@ static void instr_jr_cc_imm8(void) {
         scheduled_instructions[1] = &machine_nop;
         num_scheduled_instructions = 2;
     }
-    
 }
 
 
@@ -1758,35 +1791,4 @@ static void instr_halt(void) {
     /* enter HALT mode */
     scheduled_instructions[0] = &machine_halt;
     num_scheduled_instructions = 1;
-}
-
-
-void queue_instruction(void) {
-    /* read the opcode at the PC and queue an instruction's atomic instructions */
-    uint8_t opcode = read_byte(get_r16(R16PC));
-
-    if (opcode == 0xCB) {
-        (prefixed_instructions[read_byte(get_r16(R16PC)+1)])();
-    } else {
-        (instructions[opcode])();
-    }
-    current_instruction_count = 0;
-}
-
-
-void load_interrupt_instructions(uint8_t isr) {
-    /* load the atomic instructions that execute during interrupt handling */
-    r16 = R16PC;
-    addr = 0x40+(isr<<3);
-    scheduled_instructions[0] = &machine_idle;
-    scheduled_instructions[1] = &machine_dec_sp;
-    scheduled_instructions[2] = &machine_push_r16_high_dec_sp;
-    scheduled_instructions[3] = &machine_push_r16_low;
-    scheduled_instructions[4] = &machine_set_pc_addr;
-    num_scheduled_instructions = 5;
-    current_instruction_count = 0;
-    // set_ime(0); //disable isr flag
-    // reg.SP-=2; //execute a CALL (push PC to stack)
-    // write_word(reg.SP, reg.PC);
-    // set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
 }

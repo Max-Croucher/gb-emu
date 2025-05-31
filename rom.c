@@ -50,16 +50,16 @@ void print_error(char errormsg[]) {
 
 void print_header() {
     /* print the contents of a gameboy header */
-    fprintf(stderr,"Header contents:\n");
-    fprintf(stderr,"Title:          %s\n", rom.title);
-    fprintf(stderr,"Licensee (new): %c%c\n", rom.new_licensee>>8, rom.new_licensee&0xFF);
-    fprintf(stderr,"Super Gameboy:  %d\n", rom.sgbflag);
-    fprintf(stderr,"Cartrige Type:  %d\n", rom.carttype);
-    fprintf(stderr,"ROM Size Code:  %d\n", rom.romsize);
-    fprintf(stderr,"RAM Size Code:  %d\n", rom.ramsize);
-    fprintf(stderr,"Global Release: 0x%.2x\n", rom.locale);
-    fprintf(stderr,"Licensee (old): 0x%.2x\n", rom.old_licensee);
-    fprintf(stderr,"Version:        %d\n", rom.version);
+    printf("Header contents:\n");
+    printf("Title:          %s\n", rom.title);
+    printf("Licensee (new): %c%c\n", rom.new_licensee>>8, rom.new_licensee&0xFF);
+    printf("Super Gameboy:  %d\n", rom.sgbflag);
+    printf("Cartrige Type:  %d\n", rom.carttype);
+    printf("ROM Size Code:  %d\n", rom.romsize);
+    printf("RAM Size Code:  %d\n", rom.ramsize);
+    printf("Global Release: 0x%.2x\n", rom.locale);
+    printf("Licensee (old): 0x%.2x\n", rom.old_licensee);
+    printf("Version:        %d\n", rom.version);
 }
 
 

@@ -7,17 +7,18 @@
 #ifndef OPCODES_H
 #define OPCODES_H
 
-
 void queue_instruction(void);
-void load_interrupt_instructions(uint8_t);
+void load_interrupt_instructions(uint8_t isr);
 
 static void machine_nop(void);
 static void machine_idle(void);
+static void machine_consume_prefix();
 static void machine_load_r8_r8(void);
 static void machine_load_Z_imm8(void);
 static void machine_load_W_imm8(void);
 static void machine_load_r8_Z(void);
 static void machine_load_Z_r8(void);
+static void machine_load_addr_r8(void);
 static void machine_load_Z_addr(void);
 static void machine_load_addr_Z(void);
 static void machine_load_addr_low_imm8(void);
@@ -36,6 +37,7 @@ static void machine_inc_r8(void);
 static void machine_inc_r16(void);
 static void machine_inc_Z(void);
 static void machine_dec_sp(void);
+static void machine_dec_sp_inc_pc(void);
 static void machine_dec_r8(void);
 static void machine_dec_r16(void);
 static void machine_dec_Z(void);
@@ -43,7 +45,7 @@ static void machine_add_l_spl_Z(void);
 static void machine_add_h_sph_Z(void);
 static void machine_add_Z_spl_Z(void);
 static void machine_add_W_sph_c(void);
-static void machine_add_l_r16l(void) ;
+static void machine_add_l_r16l(void);
 static void machine_add_h_r16h(void);
 static void machine_add_Z(void);
 static void machine_sub_Z(void);
@@ -77,13 +79,15 @@ static void machine_res_W_r8(void);
 static void machine_res_addr_W_Z(void);
 static void machine_set_W_r8(void);
 static void machine_set_addr_W_Z(void);
-static void machine_add_WZ_r16_Z(void);
+static void machine_add_WZ_r16_Z_1(void);
 static void machine_ime_enable(void);
 static void machine_ime_enable_late(void);
 static void machine_ime_disable(void);
 static void machine_stop(void);
 static void machine_halt(void);
 static void machine_set_pc_addr(void);
+
+
 static void instr_nop(void);
 static void instr_invalid(void);
 static void instr_ld_r8_r8(void);
