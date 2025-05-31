@@ -19,7 +19,9 @@ bool LOOP = 1; //extern
 bool OAM_DMA = 0; //extern
 uint16_t OAM_DMA_timeout = 0; //extern
 uint16_t system_counter = 0xABCE; //extern
-bool TIMA_overflow_delay = 0; //extern
+uint8_t TIMA_overflow_delay = 0; //extern
+bool TIMA_overflow_flag = 0; //extern
+bool timer_last_state = 0;
 bool do_div_reset;
 uint16_t div_reset_old_sysclk;
 extern uint16_t system_counter;
@@ -33,43 +35,35 @@ extern gbRom rom;
 
 void increment_timers(void) {
     /* Handle the incrementing and overflowing of timers */
-    uint16_t fallen_bits;
     if (do_div_reset) {
-        fallen_bits = div_reset_old_sysclk;
         do_div_reset = 0;
     } else {
-        fallen_bits = system_counter;
-        fallen_bits &= (~(++system_counter)); // find all bits that are high in the pre-incremented sysclk, but low after incrementing
+        system_counter++;
     }
-    uint8_t TAC = *(ram+0xFF07);
-    bool trigger = 0;
-    bool do_interrupt = 0;
-    if (TAC&4) { // Is timer enabled
-        switch (TAC&3) // Select timer speed
+    bool timer_current_state = 0;
+    if ((*(ram+0xFF07)>>2)&1) { // is timer enabled in TAC
+        switch ((*(ram+0xFF07))&3) // Select timer speed
         {
         case 0: //4096 Hz
-            if ((fallen_bits>>9)&1) {(*(ram+0xFF05))++; trigger=1;}
+            timer_current_state = (system_counter>>9)&1;
             break;
         case 3: //16384 Hz
-            if ((fallen_bits>>7)&1) {(*(ram+0xFF05))++; trigger=1;}
+            timer_current_state = (system_counter>>7)&1;
             break;
         case 2: //65536 Hz
-            if ((fallen_bits>>5)&1) {(*(ram+0xFF05))++; trigger=1;}
+            timer_current_state = (system_counter>>5)&1;
             break;
         case 1: //262144 Hz
-            if ((fallen_bits>>3)&1) {(*(ram+0xFF05))++; trigger=1;}
+            timer_current_state = (system_counter>>3)&1;
             break;
         }
-        //printf("TIMA 0x%.4x\n", *(ram+0xFF05));
-        if (trigger) printf("inc TIMA to 0x%.2x at sysclk=%.4x\n", (*(ram+0xFF05)), system_counter);
-        if (trigger && !*(ram+0xFF05)) { //TIMA overflows
-            do_interrupt = 1;
-        }
     }
-    if (do_interrupt) TIMA_overflow_delay = 1;
-
+    if (timer_last_state && !timer_current_state) { // falling edge
+        (*(ram+0xFF05))++; // inc TIMA
+        if (!*(ram+0xFF05)) TIMA_overflow_delay = 2; // trigger overflow
+    }
+    timer_last_state = timer_current_state;
 }
-
 
 void init_registers(void) {
     /* Initialise the gameboy registers, with appropriate PC */
@@ -277,7 +271,6 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
-
     if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return; // Most of the bus is inaccessible during DMA
 
     if (addr == 0xFF46) { // enter DMA mode
@@ -315,27 +308,31 @@ void write_byte(uint16_t addr, uint8_t byte) {
         return;
     }
     if (addr == 0xFF04) { //writing to DIV sets it to 0, but requires special timer behaviour
-        printf("Reset DIV at sysclk=0x%.4x\n", system_counter);
         div_reset_old_sysclk=system_counter;
         system_counter = 0;
         do_div_reset=1;
         increment_timers();
         return;
     }
-    //strange TIMA behaviour
-    if (addr == 0xFF05) { //TIMA 
-        if (!*(ram+addr)) {
-            //to do
+
+    if (addr == 0xFF05) { // writing to TIMA
+        if (TIMA_overflow_delay == 2) {
+            TIMA_overflow_delay = 0; // don't trigger overflow
             *(ram+addr) = byte;
             return;
+        } 
+        if (TIMA_overflow_flag) {
+            *(ram+0xFF05) = *(ram+0xFF06);
+            return;
         }
-        if (*(ram+0xFF05) == *(ram+0xFF06)) return;
     }
-    if (addr == 0xFF06 && (*(ram+0xFF05) == *(ram+0xFF06))) {//writing to TMA on overflow: write to both
-        *(ram+0xFF05) = byte;
-        *(ram+0xFF06) = byte;
+    if (addr == 0xFF06) { //writing to TMA
+        if (TIMA_overflow_flag) *(ram+0xFF05) = byte;
+        *(ram+addr) = byte;
         return;
     }
+
+
     if (addr == 0xFF44) return;
     if (addr == 0xFF41) {
         *(ram+addr) &= 0x87;
@@ -358,7 +355,6 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
-
     if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return 0xFF; // Most of the bus is inaccessible during DMA
 
     if (addr < 0x8000) return read_rom(addr); // Read from ROM
@@ -371,7 +367,6 @@ uint8_t read_byte(uint16_t addr) {
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
     //if (addr == 0xFF05) printf("Reading TIMA at sysclk=0x%.4x. Got 0x%.2x\n", system_counter, *(ram+addr));
     if (addr == 0xFF04) { //reading DIV
-        printf("Reading DIV at sysclk=0x%.4x\n", system_counter);
         return system_counter>>8;
     }
     // if (addr > 0xFF00) { //Special instructions

@@ -44,12 +44,13 @@ bool no_display = 0;
 bool verbose_logging = 0;
 
 extern uint16_t system_counter;
-extern bool TIMA_overflow_delay;
+extern uint8_t TIMA_overflow_delay;
 extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
 extern bool OAM_DMA;
 extern uint16_t OAM_DMA_timeout;
+extern bool TIMA_overflow_flag;
 extern bool do_ei_set;
 extern uint8_t do_haltmode;
 extern void (*scheduled_instructions[10])(void);
@@ -113,18 +114,23 @@ int main(int argc, char *argv[]) {
             }
 
             if (!(system_counter&3)) {
+
+                if (TIMA_overflow_delay) { // do TIMA overflow late
+                    TIMA_overflow_delay--;
+                    if ((!*(ram+0xFF05)) && (!TIMA_overflow_delay)) {
+                        *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
+                        *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
+                        TIMA_overflow_flag = 1;
+                    }
+                }
+
+
                 if (current_instruction_count == num_scheduled_instructions) {
                     if (do_ei > 0) {
                         do_ei--;
                         if (!do_ei)set_ime(1); // set EI late
                     }
 
-                    if (TIMA_overflow_delay) { // do TIMA overflow late
-                        printf("TIMA reset to 0x%.2x, sysclk=0x%.4x\n", *(ram+0xFF06), system_counter);
-                        TIMA_overflow_delay = 0;
-                        *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
-                        *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
-                    }
 
                     if (verbose_logging) fprintf(logfile, "A:%.2x F:%.2x B:%.2x C:%.2x D:%.2x E:%.2x H:%.2x L:%.2x SP:%.4x PC:%.4x PCMEM:%.2x,%.2x,%.2x,%.2x IME:%d HALTMODE:%d STOP:%d IE:%.2x IF:%.2x OPCODES: %s\n",
                         get_r8(R8A),get_r8(R8F),get_r8(R8B),get_r8(R8C),
@@ -145,12 +151,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                printf("count %d/%d | sysclk=0x%.4x", current_instruction_count, num_scheduled_instructions, system_counter);
-                if (current_instruction_count == 0) {
-                    printf(" | OPCODE=0x%.2x INSTR=%s\n\n", *(ram+get_r16(R16PC)), ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))]));
-                } else {
-                    printf("\n\n");
-                }
+
+                // printf("\ncount %d/%d | sysclk=0x%.4x", current_instruction_count, num_scheduled_instructions, system_counter);
+                // if (current_instruction_count == 0) {
+                //     printf(" | OPCODE=0x%.2x INSTR=%s\n", *(ram+get_r16(R16PC)), ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))]));
+                // } else {
+                //     printf("\n");
+                // }
 
                 if (!halt_state) {
                     scheduled_instructions[current_instruction_count]();
@@ -169,6 +176,7 @@ int main(int argc, char *argv[]) {
                         do_ei_set = 0;
                     }
                 }
+                TIMA_overflow_flag = 0;
             }
             if (!no_display) tick_graphics();
             //usleep(10);
