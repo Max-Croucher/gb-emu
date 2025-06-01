@@ -49,7 +49,8 @@ extern Registers reg;
 extern gbRom rom;
 extern bool LOOP;
 extern bool OAM_DMA;
-extern uint16_t OAM_DMA_timeout;
+extern uint8_t OAM_DMA_starter;
+extern bool OAM_DMA_timeout;
 extern bool TIMA_overflow_flag;
 extern bool do_ei_set;
 extern uint8_t do_haltmode;
@@ -104,16 +105,17 @@ int main(int argc, char *argv[]) {
             if ((*(ram+0xFF00)&0xF) != 0xF) stop_mode = 0; 
         } else {
 
-            if (OAM_DMA) {
-                if ((OAM_DMA_timeout&3) == 0) {
-                    uint8_t lower_addr = 160 - (OAM_DMA_timeout>>2);
-                    *(ram + 0xFE00 + lower_addr) = *(ram + ((uint16_t)(*(ram+0xFF46))<<8) + lower_addr);
-                }
-                OAM_DMA_timeout -= 1;
-                if (!OAM_DMA_timeout) OAM_DMA = 0;
-            }
-
             if (!(system_counter&3)) {
+                if (OAM_DMA_starter) {
+                    OAM_DMA_starter--;
+                    if (!OAM_DMA_starter) {
+                        fprintf(stderr, "DMA: starting at sysclk=0x%.4x\n", system_counter);
+                        printf("DMA: starting at sysclk=0x%.4x\n", system_counter);
+                        OAM_DMA = 1;
+                        OAM_DMA_timeout = 0;
+                    }
+                }
+                if (OAM_DMA) read_dma();
 
                 if (TIMA_overflow_delay) { // do TIMA overflow late
                     TIMA_overflow_delay--;

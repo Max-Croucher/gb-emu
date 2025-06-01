@@ -16,6 +16,7 @@
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
 bool LOOP = 1; //extern
+uint8_t OAM_DMA_starter = 0; //extern
 bool OAM_DMA = 0; //extern
 uint16_t OAM_DMA_timeout = 0; //extern
 uint16_t system_counter = 0xABCE; //extern
@@ -271,15 +272,13 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
-    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return; // Most of the bus is inaccessible during DMA
-
+    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) { // Most of the bus is inaccessible during DMA
+        if (addr!= 0xFF46) return; 
+    }
     if (addr == 0xFF46) { // enter DMA mode
-        if (byte < 0xE0) {
-            *(ram+addr) = byte;
-            //fprintf(stderr,  "Started DMA from addr 0x%.2x\n", byte);
-            OAM_DMA = 1;
-            OAM_DMA_timeout = 640;
-        }
+        *(ram+addr) = byte;
+        printf("DMA: Scheduled start at sysclk=%.4x\n", system_counter);
+        OAM_DMA_starter = 2;
         return;
     }
 
@@ -355,8 +354,10 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
-    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) return 0xFF; // Most of the bus is inaccessible during DMA
-
+    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) { // Most of the bus is inaccessible during DMA
+        if (addr == 0xFF46) return *(ram+addr); 
+        return 0xFF;
+    }
     if (addr < 0x8000) return read_rom(addr); // Read from ROM
 
     if (addr >= 0xA000 && addr < 0xC000) { // Reading from external RAM
@@ -394,6 +395,24 @@ void write_word(uint16_t addr, uint16_t word) {
 uint16_t read_word(uint16_t addr) {
     /* Read a word from a particular address and the next. */
     return (((uint16_t)read_byte(addr+1)) << 8) + read_byte(addr);
+}
+
+
+uint8_t read_dma(void) {
+    /* read a byte from the appropriate location for DMA */
+    if  (*(ram+0xFF46) < 0x80) { // Read from ROM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = read_rom((*(ram+0xFF46)<<8) + OAM_DMA_timeout);
+    } else if (*(ram+0xFF46) < 0xA0) { // Read from VRAM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (*(ram+0xFF46)<<8) + OAM_DMA_timeout);
+    } else if (*(ram+0xFF46) < 0xC0) { // Read from External RAM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = read_ext_ram((*(ram+0xFF46)<<8) + OAM_DMA_timeout);
+    } else { // Read from WRAM
+        uint8_t high_addr = *(ram+0xFF46);
+        if (high_addr >= 0xE0) high_addr -= 0x20;
+        *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (high_addr<<8) + OAM_DMA_timeout);
+    }
+    OAM_DMA_timeout++;
+    if (OAM_DMA_timeout==160) OAM_DMA = 0;
 }
 
 

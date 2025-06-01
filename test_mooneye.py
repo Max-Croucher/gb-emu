@@ -4,8 +4,9 @@ from pathlib import Path
 ROMDIRS = [
     # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc1"),
     # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc2"),
-    # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc5"),
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/timer")
+    # Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/emulator-only/mbc5")
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/timer"),
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/oam_dma")
 ]
 EMU = Path("/home/max/Documents/stuff/programming/repos/gb-emu/gbemu")
 
