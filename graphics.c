@@ -35,10 +35,12 @@ char window_name[32];
 uint8_t xoffset = 0;
 static uint32_t dot = 0;
 uint8_t window_internal_counter = 0;
-GLint WindowMain, WindowDebug;
+GLint WindowMain = 1;
+GLint WindowDebug = 2;
 GLubyte texture[144][160][3];
 GLubyte bg_tilemap[256][256][3];
 GLubyte window_tilemap[256][256][3];
+GLubyte object_tilemap[16][320][3];
 bool bgw_priority_map[144][160];
 ObjectAttribute objects[10];
 uint8_t objects_found = 0;
@@ -106,6 +108,32 @@ void gl_tick(void) {
 }
 
 
+void object_map_draw_quad(uint8_t i) {
+    /**/
+    float height_unit = 72.0/512;
+    glBegin(GL_POLYGON);
+        glTexCoord2f(((float)i)/40,0); glVertex2f((5 + 38.0*i)/768,height_unit*1.75);
+        glTexCoord2f(((float)i)/40,1); glVertex2f((5 + 38.0*i)/768,height_unit*2.75);
+        glTexCoord2f(((float)i+1)/40,1); glVertex2f((5 + 38.0*i + 36)/768,height_unit*2.75);
+        glTexCoord2f(((float)i+1)/40,0); glVertex2f((5 + 38.0*i + 36)/768,height_unit*1.75);
+    glEnd();
+    glBegin(GL_POLYGON);
+        glTexCoord2f(((float)i)/40+0.5,0); glVertex2f((5 + 38.0*i)/768,height_unit*0.25);
+        glTexCoord2f(((float)i)/40+0.5,1); glVertex2f((5 + 38.0*i)/768,height_unit*1.25);
+        glTexCoord2f(((float)i+1)/40+0.5,1); glVertex2f((5 + 38.0*i + 36)/768,height_unit*1.25);
+        glTexCoord2f(((float)i+1)/40+0.5,0); glVertex2f((5 + 38.0*i + 36)/768,height_unit*0.25);
+    glEnd();
+}
+
+
+void draw_text(float x, float y, void *font, const char* string) {
+    /* draw a string on the screen */  
+  char *c;
+  glColor3f(0, 0, 0); 
+  glRasterPos2f(x, y);
+  glutBitmapString(font, string);
+}
+
 void gl_tick_debug_window(void) {
     /* update debug window */
     glClear(GL_COLOR_BUFFER_BIT);
@@ -117,26 +145,56 @@ void gl_tick_debug_window(void) {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glBegin(GL_POLYGON);
-        glTexCoord2f(0,0); glVertex2f(1.0/12,0.375);
-        glTexCoord2f(0,1); glVertex2f(1.0/12,0.875);
-        glTexCoord2f(1,1); glVertex2f(5.0/12,0.875);
-        glTexCoord2f(1,0); glVertex2f(5.0/12,0.375);
+        glTexCoord2f(0,0); glVertex2f(0.25/12,0.475);
+        glTexCoord2f(0,1); glVertex2f(0.25/12,0.975);
+        glTexCoord2f(1,1); glVertex2f(4.25/12,0.975);
+        glTexCoord2f(1,0); glVertex2f(4.25/12,0.475);
     glEnd();
-	glDisable(GL_TEXTURE_2D);
-    glEnable(GL_TEXTURE_2D);
     glTexImage2D(GL_TEXTURE_2D,0,3,256,256,0,GL_RGB, GL_UNSIGNED_BYTE, window_tilemap);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glBegin(GL_POLYGON);
-        glTexCoord2f(0,0); glVertex2f(7.0/12,0.375);
-        glTexCoord2f(0,1); glVertex2f(7.0/12,0.875);
-        glTexCoord2f(1,1); glVertex2f(11.0/12,0.875);
-        glTexCoord2f(1,0); glVertex2f(11.0/12,0.375);
+        glTexCoord2f(0,0); glVertex2f(7.75/12,0.475);
+        glTexCoord2f(0,1); glVertex2f(7.75/12,0.975);
+        glTexCoord2f(1,1); glVertex2f(11.75/12,0.975);
+        glTexCoord2f(1,0); glVertex2f(11.75/12,0.475);
     glEnd();
+    glTexImage2D(GL_TEXTURE_2D,0,3,320,16,0,GL_RGB, GL_UNSIGNED_BYTE, object_tilemap);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    for (int i=0; i<20; i++) {
+        object_map_draw_quad(i);
+    }
 	glDisable(GL_TEXTURE_2D);
+    char string[64];
+    sprintf(string, "LCDC      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF40)>>7)&1,(*(ram+0xFF40)>>6)&1,(*(ram+0xFF40)>>5)&1,(*(ram+0xFF40)>>4)&1,(*(ram+0xFF40)>>3)&1,(*(ram+0xFF40)>>2)&1,(*(ram+0xFF40)>>1)&1,(*(ram+0xFF40)>>0)&1);
+    draw_text(0.36,0.95, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "LY | LYC  = 0x%.2x | 0x%.2x", *(ram+0xFF44), *(ram+0xFF45));
+    draw_text(0.36,0.9, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "STAT      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF41)>>7)&1,(*(ram+0xFF41)>>6)&1,(*(ram+0xFF41)>>5)&1,(*(ram+0xFF41)>>4)&1,(*(ram+0xFF41)>>3)&1,(*(ram+0xFF41)>>2)&1,(*(ram+0xFF41)>>1)&1,(*(ram+0xFF41)>>0)&1);
+    draw_text(0.36,0.85, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "SCX | SCY = 0x%.2x | 0x%.2x", *(ram+0xFF43), *(ram+0xFF42));
+    draw_text(0.36,0.80, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "WX+7 | WY = 0x%.2x | 0x%.2x", *(ram+0xFF4B), *(ram+0xFF4A));
+    draw_text(0.36,0.75, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "BGP       = 0x%.2x", *(ram+0xFF47));
+    draw_text(0.36,0.70, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "OBP0|OBP1 = 0x%.2x | 0x%.2x", *(ram+0xFF48), *(ram+0xFF49));
+    draw_text(0.36,0.65, GLUT_BITMAP_9_BY_15, string);
 
+
+
+    draw_text(0.005,0.4, GLUT_BITMAP_9_BY_15, "0x00");
+    draw_text(0.4,0.4, GLUT_BITMAP_9_BY_15, "0x08");
+    draw_text(0.8,0.4, GLUT_BITMAP_9_BY_15, "0x10");
+    draw_text(0.205,0.19, GLUT_BITMAP_9_BY_15, "0x18");
+    draw_text(0.605,0.19, GLUT_BITMAP_9_BY_15, "0x20");
+    
+    glColor3f(1,1,1);
     glPopMatrix();
     glutSwapBuffers();
 }
@@ -180,7 +238,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
         glutInitWindowSize(768, 512);
         glutInitWindowPosition(500,100);
         WindowDebug = glutCreateWindow("Tilemaps and Objects");
-        glClearColor(1.0,1.0,1.0,0.0);
+        glClearColor(0.9,0.9,0.9,0.0);
         glShadeModel(GL_FLAT);
         glutDisplayFunc(gl_tick_debug_window);
         glutReshapeFunc(reshape_window);
@@ -188,7 +246,6 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
         glutKeyboardUpFunc(key_released);
         glutCloseFunc(window_closed);
     }
-
     //start
     glutMainLoopEvent();
     start = clock();
@@ -521,7 +578,8 @@ bool tick_graphics(void) {
             if (debug_tilemap) {
                 glutSetWindow(WindowDebug);
                 debug_tilemaps();
-                //print_sprites();
+                debug_sprites();
+
                 glutMainLoopEvent();
                 glutPostRedisplay();
                 glutSetWindow(WindowMain);
@@ -532,8 +590,6 @@ bool tick_graphics(void) {
             *(ram+0xFF41) += 2; // set ppu mode to 2
             read_objects();
             qsort(objects, objects_found, sizeof(ObjectAttribute), compare_obj_xvalue);
-            //print_sprites();
-
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 3; // set ppu mode to 3
@@ -558,28 +614,53 @@ bool tick_graphics(void) {
 }
 
 
+void debug_draw_background_tile(uint16_t tile[8], GLubyte tex_array[256][256][3], uint8_t base_x, uint8_t base_y) {
+    /* draw a tile at a particular coordinate */
+    for (int v=0; v<8; v++) {
+        for (int u=0; u<8; u++) {
+            uint8_t pix = (tile[u] >> (14-2*v))&3;
+            tex_array[255-(base_y*8+u)][base_x*8+v][0] = pixvals[get_background_palette(pix)];
+            tex_array[255-(base_y*8+u)][base_x*8+v][1] = pixvals[get_background_palette(pix)];
+            tex_array[255-(base_y*8+u)][base_x*8+v][2] = pixvals[get_background_palette(pix)];
+        }
+    }
+}
+
+
+void debug_draw_sprite_tile(uint16_t tile[8], uint8_t base_x, uint8_t base_y, ObjectAttribute object) {
+    /* draw a tile at a particular coordinate */
+    for (int v=0; v<8; v++) {
+        for (int u=0; u<8; u++) {
+            uint8_t pix;
+            if (object.xflip) {
+                pix = (tile[u] >> (2*v))&3;
+            } else {
+                pix = (tile[u] >> (14-2*v))&3;
+            }
+            uint8_t ypos;
+            if (object.yflip) {
+                ypos = base_y*8+u;
+            } else {
+                ypos = 15-(base_y*8+u);
+            }
+            object_tilemap[ypos][base_x*8+v][0] = pixvals[get_object_palette(object.palette, pix)];
+            object_tilemap[ypos][base_x*8+v][1] = pixvals[get_object_palette(object.palette, pix)];
+            object_tilemap[ypos][base_x*8+v][2] = pixvals[get_object_palette(object.palette, pix)];
+        }
+    }
+}
+
+
 void debug_tilemaps(void) {
+    /* draw the background and window tilespaces on the debug window */
     for (int y=0; y<32; y++) {
         for (int x=0; x<32; x++) {
             uint16_t tile[8];
             load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 0), 0));
-            for (int v=0; v<8; v++) {
-                for (int u=0; u<8; u++) {
-                    uint8_t pix = (tile[u] >> (14-2*v))&3;
-                    bg_tilemap[255-(y*8+u)][x*8+v][0] = pixvals[get_background_palette(pix)];
-                    bg_tilemap[255-(y*8+u)][x*8+v][1] = pixvals[get_background_palette(pix)];
-                    bg_tilemap[255-(y*8+u)][x*8+v][2] = pixvals[get_background_palette(pix)];
-                }
-            }
+            debug_draw_background_tile(tile, bg_tilemap, x, y);
+
             load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 1), 0));
-            for (int v=0; v<8; v++) {
-                for (int u=0; u<8; u++) {
-                    uint8_t pix = (tile[u] >> (14-2*v))&3;
-                    window_tilemap[255-(y*8+u)][x*8+v][0] = pixvals[get_background_palette(pix)];
-                    window_tilemap[255-(y*8+u)][x*8+v][1] = pixvals[get_background_palette(pix)];
-                    window_tilemap[255-(y*8+u)][x*8+v][2] = pixvals[get_background_palette(pix)];
-                }
-            }
+            debug_draw_background_tile(tile, window_tilemap, x, y);
         }
     }
     for (int x=-1; x<161; x++) {
@@ -601,55 +682,29 @@ void debug_tilemaps(void) {
 }
 
 
-void print_sprites(void) {
+void debug_sprites(void) {
     /* Debug util to display each sprite */
-    char print_palette[4] = {' ', '.', 'o', '0'};
-    // printf("Frame!\n");
-    // printf("Palette 0: %.2x [%c%c%c%c]\n", *(ram+0xFF48), print_palette[(*(ram+0xFF48)>>6)&3], print_palette[(*(ram+0xFF48)>>4)&3], print_palette[(*(ram+0xFF48)>>2)&3], print_palette[(*(ram+0xFF48)>>0)&3]);
-    // printf("Palette 1: %.2x [%c%c%c%c]\n", *(ram+0xFF49), print_palette[(*(ram+0xFF49)>>6)&3], print_palette[(*(ram+0xFF49)>>4)&3], print_palette[(*(ram+0xFF49)>>2)&3], print_palette[(*(ram+0xFF49)>>0)&3]);
-    // for (int i=0; i<40; i++) {
-    //     uint8_t flags = *(ram+0xFE00+(i*4)+3);
-    //     ObjectAttribute object = (ObjectAttribute) {
-    //         .ypos = *(ram+0xFE00+(i*4)),
-    //         .xpos = *(ram+0xFE00+(i*4)+1),
-    //         .tileid = *(ram+0xFE00+(i*4)+2),
-    //         .priority = flags & (1<<7),
-    //         .yflip = flags & (1<<6),
-    //         .xflip = flags & (1<<5),
-    //         .palette = flags & (1<<4)
-    //     };
-    //     printf("Object %d, at position (%d, %d). TileID 0x%.2x with palette %d. Memory at 0x%.4x: (0x %.2x %.2x %.2x %.2x)\n", i, object.xpos-8, object.ypos-16, object.tileid, object.palette, 0xFE00+(i*4), *(ram+0xFE00+(i*4)), *(ram+0xFE00+(i*4))+1, *(ram+0xFE00+(i*4))+2, *(ram+0xFE00+(i*4))+3);
-    //     uint16_t sprite[8];
-    //     load_tile(sprite, get_tile_addr(object.tileid, 1));
-    //     for (int j = 0; j<8; j++) {
-    //         for (int k=7; k>=0; k--) {
-    //             if ((sprite[j]>>(2*k))&3) {
-    //                 printf("%c", print_palette[get_object_palette(object.palette, (sprite[j]>>(2*k))&3)]);
-    //             } else {
-    //                 printf(" ");
-    //             }
-    //         }
-    //         printf("\n");   
-    //     }
-    // }
 
-
-    printf("Scanline %d. Found %d objects to draw!\n", *(ram+0xFF44), objects_found);
-    for (int i=0; i<objects_found; i++) {
+    uint16_t blank[8] = {0,0,0,0,0,0,0,0};
+    for (int i=0; i<40; i++) {
+        uint8_t flags = *(ram+0xFE00+(i*4)+3);
+        ObjectAttribute object = (ObjectAttribute) {
+            .ypos = *(ram+0xFE00+(i*4)),
+            .xpos = *(ram+0xFE00+(i*4)+1),
+            .tileid = *(ram+0xFE00+(i*4)+2),
+            .priority = flags & (1<<7),
+            .yflip = flags & (1<<6),
+            .xflip = flags & (1<<5),
+            .palette = flags & (1<<4)
+        };
         uint16_t sprite[8];
-        load_tile(sprite, get_tile_addr(objects[i].tileid, 1));
-        for (int j = 0; j<8; j++) {
-            for (int k=7; k>=0; k--) {
-                if ((sprite[j]>>(2*k))&3) {
-                    printf("%c", print_palette[get_object_palette(objects[i].palette, (sprite[j]>>(2*k))&3)]);
-                } else {
-                    printf(" ");
-                }
-            }
-            printf("\n");   
+        load_tile(sprite, get_tile_addr(object.tileid, 1));
+        debug_draw_sprite_tile(sprite, i, object.yflip, object);
+        if (*(ram+0xFF40)&4) { // 8x16 sprites
+            load_tile(sprite, get_tile_addr(object.tileid+1, 1));
+            debug_draw_sprite_tile(sprite, i, !object.yflip, object);
+        } else {
+            debug_draw_sprite_tile(blank, i, !object.yflip, object);
         }
     }
-
-
-
 }
