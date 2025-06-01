@@ -19,6 +19,7 @@ extern uint8_t* rom;
 extern JoypadState joypad_state;
 extern bool LOOP;
 extern bool hyperspeed;
+extern bool debug_tilemap;
 
 clock_t start,end;
 double rolling_frametime = 0;
@@ -34,7 +35,11 @@ char window_name[32];
 uint8_t xoffset = 0;
 static uint32_t dot = 0;
 uint8_t window_internal_counter = 0;
+GLint WindowMain, WindowDebug;
 GLubyte texture[144][160][3];
+GLubyte bg_tilemap[256][256][3];
+GLubyte window_tilemap[256][256][3];
+bool bgw_priority_map[144][160];
 ObjectAttribute objects[10];
 uint8_t objects_found = 0;
 uint8_t pixvals[5] = {0xF8, 0xA0, 0x50, 0x00, 0xFF};
@@ -78,26 +83,57 @@ void framerate(void) {
 }
 
 
-void init_screen_tex(void) {
+void gl_tick(void) {
+    /* update graphics */
+    glClear(GL_COLOR_BUFFER_BIT);
+    glPushMatrix();
     glEnable(GL_TEXTURE_2D);
     glTexImage2D(GL_TEXTURE_2D,0,3,160,144,0,GL_RGB, GL_UNSIGNED_BYTE, texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-}
-
-void gl_tick(void) {
-    /* update graphics */
-    glClear(GL_COLOR_BUFFER_BIT);
-    glPushMatrix();
-    //glColor3f(0.0,1.0,0.0);
-    init_screen_tex();
     glBegin(GL_POLYGON);
         glTexCoord2f(0,0); glVertex2f(0,0);
         glTexCoord2f(0,1); glVertex2f(0,1);
         glTexCoord2f(1,1); glVertex2f(1,1);
         glTexCoord2f(1,0); glVertex2f(1,0);
+    glEnd();
+	glDisable(GL_TEXTURE_2D);
+
+    glPopMatrix();
+    glutSwapBuffers();
+}
+
+
+void gl_tick_debug_window(void) {
+    /* update debug window */
+    glClear(GL_COLOR_BUFFER_BIT);
+    glPushMatrix();
+    glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D,0,3,256,256,0,GL_RGB, GL_UNSIGNED_BYTE, bg_tilemap);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glBegin(GL_POLYGON);
+        glTexCoord2f(0,0); glVertex2f(1.0/12,0.375);
+        glTexCoord2f(0,1); glVertex2f(1.0/12,0.875);
+        glTexCoord2f(1,1); glVertex2f(5.0/12,0.875);
+        glTexCoord2f(1,0); glVertex2f(5.0/12,0.375);
+    glEnd();
+	glDisable(GL_TEXTURE_2D);
+    glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D,0,3,256,256,0,GL_RGB, GL_UNSIGNED_BYTE, window_tilemap);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glBegin(GL_POLYGON);
+        glTexCoord2f(0,0); glVertex2f(7.0/12,0.375);
+        glTexCoord2f(0,1); glVertex2f(7.0/12,0.875);
+        glTexCoord2f(1,1); glVertex2f(11.0/12,0.875);
+        glTexCoord2f(1,0); glVertex2f(11.0/12,0.375);
     glEnd();
 	glDisable(GL_TEXTURE_2D);
 
@@ -119,12 +155,16 @@ void reshape_window(int w, int h) {
 
 void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     /* Main init procedure for graphics */
+
+    //shared init
     glutInit(argc,argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
+
+    //init main window
     glutInitWindowSize(320,288);
     glutInitWindowPosition(100,100);
     memcpy(rom_name, rom_title, 16);
-    glutCreateWindow(rom_name);
+    WindowMain = glutCreateWindow(rom_name);
     glClearColor(0.0,0.0,0.0,0.0);
     glShadeModel(GL_FLAT);
     glutDisplayFunc(gl_tick);
@@ -133,10 +173,26 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     glutKeyboardFunc(key_pressed);
     glutKeyboardUpFunc(key_released);
     glutCloseFunc(window_closed);
+
+    
+    //init debug menu
+    if (debug_tilemap) {
+        glutInitWindowSize(768, 512);
+        glutInitWindowPosition(500,100);
+        WindowDebug = glutCreateWindow("Tilemaps and Objects");
+        glClearColor(1.0,1.0,1.0,0.0);
+        glShadeModel(GL_FLAT);
+        glutDisplayFunc(gl_tick_debug_window);
+        glutReshapeFunc(reshape_window);
+        glutKeyboardFunc(key_pressed);
+        glutKeyboardUpFunc(key_released);
+        glutCloseFunc(window_closed);
+    }
+
+    //start
     glutMainLoopEvent();
     start = clock();
     *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
-    //glutMainLoop();
 }
 
 
@@ -349,6 +405,7 @@ void draw_background() {
     }
     for (int i=0; i<160; i++) {
         uint8_t pix = (tiles[(i+left)>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
+        bgw_priority_map[143-*(ram+0xFF44)][i] = (bool)pix;
         texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_palette(pix)];
         texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_palette(pix)];
         texture[143-*(ram+0xFF44)][i][2] = pixvals[get_background_palette(pix)];
@@ -362,7 +419,7 @@ void draw_window() {
         if (*(ram+0xFF44) >= *(ram+0xFF4A)) { // when scanline >= window Y
             uint16_t tiles[21][8];
             for (int i=0; i<21; i++) {
-                uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 0);
+                uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 1);
                 load_tile(tiles[i], get_tile_addr(tile_id, 0));
             }
             for (int screen_x_pos = *(ram+0xFF4A) - 7; screen_x_pos < 160; screen_x_pos++) {
@@ -373,6 +430,7 @@ void draw_window() {
 
                 //draw pixel at (window_x_pos, window_y_pos) to (screen_x_pos, screen_y_pos)
                 uint8_t pix = (tiles[window_x_pos>>3][window_internal_counter%8] >> (14-(2*((window_x_pos%8)))))&3;
+                bgw_priority_map[143-*(ram+0xFF44)][screen_x_pos] |= (bool)pix;
                 texture[143-*(ram+0xFF44)][screen_x_pos][0] = pixvals[get_background_palette(pix)];
                 texture[143-*(ram+0xFF44)][screen_x_pos][1] = pixvals[get_background_palette(pix)];
                 texture[143-*(ram+0xFF44)][screen_x_pos][2] = pixvals[get_background_palette(pix)];
@@ -412,7 +470,7 @@ void draw_objects(void) {
                     }
                 }
                 uint8_t pixel = (tile_line>>(2*sprite_x))&3;
-                if (pixel) { // skip if transparent
+                if (pixel && !(target_object.priority & bgw_priority_map[143-*(ram+0xFF44)][screen_x])) { // skip if transparent and background does not have priority
                     texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
                     texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
                     texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)];
@@ -441,15 +499,14 @@ bool tick_graphics(void) {
     *(ram+0xFF41) &= 0xFB;
     *(ram+0xFF41) |= (*(ram+0xFF44) == *(ram+0xFF45))<<2; // set LY=LYC flag
 
-    bool stat_type_LYC = *(ram+0xFF41)&64;
-    bool current_stat_state = (
-        stat_type_LYC ||
-        (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
-        (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
-        (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
-    );
-    if ((old_stat_state == 0) && current_stat_state) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
-    old_stat_state = current_stat_state;
+    // bool current_stat_state = (
+    //     ((*(ram+0xFF41)&0x40)   && ((*(ram+0xFF41)>>2)&1))   || // LY=LYC is set
+    //     (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
+    //     (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
+    //     (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
+    // );
+    // if ((!old_stat_state) && current_stat_state) {*(ram+0xFF0F) |= 2; printf("STAT interrupt!\n");} // Request a STAT interrupt
+    // old_stat_state = current_stat_state;
 
     if (lcd_enable) {
         if (dot == 65564) { // enter VBLANK
@@ -461,8 +518,14 @@ bool tick_graphics(void) {
             window_internal_counter = 0;
             glutMainLoopEvent();
             glutPostRedisplay();
-            //print_tilemaps();
-            //print_sprites();
+            if (debug_tilemap) {
+                glutSetWindow(WindowDebug);
+                debug_tilemaps();
+                //print_sprites();
+                glutMainLoopEvent();
+                glutPostRedisplay();
+                glutSetWindow(WindowMain);
+            }
             framerate();
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
             *(ram+0xFF41) &= 0xFC;
@@ -474,6 +537,8 @@ bool tick_graphics(void) {
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 3; // set ppu mode to 3
+            // printf("SCANLINE %3d. LCDC=0x%.2x\n", *(ram+0xFF44), *(ram+0xFF40));
+            // printf("LYC=     %3d. STAT=0x%.2x\n\n", *(ram+0xFF45), *(ram+0xFF41));
             draw_background();
             draw_window();
             draw_objects();
@@ -493,49 +558,46 @@ bool tick_graphics(void) {
 }
 
 
-void print_tilemaps(void) {
-    printf("FRAME\n");
-    char print_palette[4] = {' ', '.', 'o', '0'};
-    
-    for (int i=0; i<32; i++) {
-        uint16_t tiles[16][8];
-        for (int j=0; j<16; j++) {
-            //load_tile(tiles[j], get_tile_addr((i*16)+j, 0));
-            load_tile(tiles[j], 0x8000 + ((uint16_t)((i*16)+j))*16);
-        }
-        for (int k=0; k<8; k++) {
-            for (int j=0; j<16; j++) {
-                for (int l=7; l>=0; l--){
-                    printf("%c", print_palette[(tiles[j][k]>>(2*l))&3]);
+void debug_tilemaps(void) {
+    for (int y=0; y<32; y++) {
+        for (int x=0; x<32; x++) {
+            uint16_t tile[8];
+            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 0), 0));
+            for (int v=0; v<8; v++) {
+                for (int u=0; u<8; u++) {
+                    uint8_t pix = (tile[u] >> (14-2*v))&3;
+                    bg_tilemap[255-(y*8+u)][x*8+v][0] = pixvals[get_background_palette(pix)];
+                    bg_tilemap[255-(y*8+u)][x*8+v][1] = pixvals[get_background_palette(pix)];
+                    bg_tilemap[255-(y*8+u)][x*8+v][2] = pixvals[get_background_palette(pix)];
                 }
             }
-            printf("\n");
+            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 1), 0));
+            for (int v=0; v<8; v++) {
+                for (int u=0; u<8; u++) {
+                    uint8_t pix = (tile[u] >> (14-2*v))&3;
+                    window_tilemap[255-(y*8+u)][x*8+v][0] = pixvals[get_background_palette(pix)];
+                    window_tilemap[255-(y*8+u)][x*8+v][1] = pixvals[get_background_palette(pix)];
+                    window_tilemap[255-(y*8+u)][x*8+v][2] = pixvals[get_background_palette(pix)];
+                }
+            }
         }
     }
-
-    // for (int i=0; i<32; i++) {
-    //     uint16_t tiles[32][8];
-    //     for (int j=0; j<32; j++) {
-    //         printf("%d, %d: %d | %.4x\n", i, j, get_tile_id(j+i*32, 0), get_tile_addr(get_tile_id(j+i*32, 0),0));
-    //         load_tile(tiles[j], get_tile_addr(get_tile_id(j+i*32, 0),0));
-    //     }
-    //     for (int k=0; k<8; k++) {
-    //         for (int j=0; j<32; j++) {
-    //             for (int l=7; l>=0; l--){
-    //                 printf("%c", print_palette[get_background_palette((tiles[j][k]>>(2*l))&3)]);
-    //             }
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-
-
-    // for (int i=0; i<144; i++) {
-    //     for (int j=0; j<160; j++) {
-    //         printf("%.2x", texture[i][j][0]);
-    //     }
-    //     printf("\n");
-    // }
+    for (int x=-1; x<161; x++) {
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
+    }
+    for (int y=0; y<144; y++) {
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [2] = 0;
+    }
 }
 
 

@@ -39,6 +39,7 @@ bool stop_mode = 0;
 
 bool halt_on_breakpoint = 0; //extern
 bool print_breakpoints = 0; //extern
+bool debug_tilemap = 0; //extern
 bool hyperspeed = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
@@ -67,6 +68,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--max-speed")) hyperspeed = 1;
         if (!strcmp(argv[i], "--windowless")) no_display = 1;
         if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
+        if (!strcmp(argv[i], "--tilemap")) debug_tilemap = 1;
     }
 }
 
@@ -156,7 +158,7 @@ int main(int argc, char *argv[]) {
 
                 // printf("\ncount %d/%d | sysclk=0x%.4x", current_instruction_count, num_scheduled_instructions, system_counter);
                 // if (current_instruction_count == 0) {
-                //     printf(" | OPCODE=0x%.2x INSTR=%s\n", *(ram+get_r16(R16PC)), ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))]));
+                //     printf(" | OPCODE=0x%.2x PC=0x%.4x INSTR=%s\n", *(ram+get_r16(R16PC)), get_r16(R16PC), ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))]));
                 // } else {
                 //     printf("\n");
                 // }

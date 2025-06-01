@@ -18,8 +18,8 @@ typedef struct {
 } ObjectAttribute;
 
 void framerate(void);
-void init_screen_tex(void);
 void gl_tick(void);
+void gl_tick_debug_window(void);
 void reshape(int w, int h);
 void init_graphics(int *argc, char *argv[], char rom_title[16]);
 void window_closed(void);
@@ -38,7 +38,7 @@ void draw_background(void);
 void draw_window(void);
 void draw_objects(void);
 bool tick_graphics(void);
-void print_tilemaps(void);
+void debug_tilemaps(void);
 void print_sprites(void);
 
 
