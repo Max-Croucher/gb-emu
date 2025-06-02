@@ -41,6 +41,9 @@ GLubyte texture[144][160][3];
 GLubyte bg_tilemap[256][256][3];
 GLubyte window_tilemap[256][256][3];
 GLubyte object_tilemap[16][320][3];
+GLubyte vram_block_1[32][256][3];
+GLubyte vram_block_2[32][256][3];
+GLubyte vram_block_3[32][256][3];
 bool bgw_priority_map[144][160];
 ObjectAttribute objects[10];
 uint8_t objects_found = 0;
@@ -48,6 +51,9 @@ uint8_t pixvals[5] = {0xF8, 0xA0, 0x50, 0x00, 0xFF};
 uint8_t priority_object[160];
 bool old_stat_state = 0;
 bool lcd_enable = 0;
+bool debug_used_objects[40] = {0};
+int debug_frameskip = 1;
+int debug_frames_done = 0;
 
 
 void framerate(void) {
@@ -112,16 +118,16 @@ void object_map_draw_quad(uint8_t i) {
     /**/
     float height_unit = 72.0/512;
     glBegin(GL_POLYGON);
-        glTexCoord2f(((float)i)/40,0); glVertex2f((5 + 38.0*i)/768,height_unit*1.75);
-        glTexCoord2f(((float)i)/40,1); glVertex2f((5 + 38.0*i)/768,height_unit*2.75);
-        glTexCoord2f(((float)i+1)/40,1); glVertex2f((5 + 38.0*i + 36)/768,height_unit*2.75);
-        glTexCoord2f(((float)i+1)/40,0); glVertex2f((5 + 38.0*i + 36)/768,height_unit*1.75);
+        glTexCoord2f(((float)i)/40,0); glVertex2f((5 + 38.0*i)/1728,height_unit*1.75);
+        glTexCoord2f(((float)i)/40,1); glVertex2f((5 + 38.0*i)/1728,height_unit*2.75);
+        glTexCoord2f(((float)i+1)/40,1); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*2.75);
+        glTexCoord2f(((float)i+1)/40,0); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*1.75);
     glEnd();
     glBegin(GL_POLYGON);
-        glTexCoord2f(((float)i)/40+0.5,0); glVertex2f((5 + 38.0*i)/768,height_unit*0.25);
-        glTexCoord2f(((float)i)/40+0.5,1); glVertex2f((5 + 38.0*i)/768,height_unit*1.25);
-        glTexCoord2f(((float)i+1)/40+0.5,1); glVertex2f((5 + 38.0*i + 36)/768,height_unit*1.25);
-        glTexCoord2f(((float)i+1)/40+0.5,0); glVertex2f((5 + 38.0*i + 36)/768,height_unit*0.25);
+        glTexCoord2f(((float)i)/40+0.5,0); glVertex2f((5 + 38.0*i)/1728,height_unit*0.25);
+        glTexCoord2f(((float)i)/40+0.5,1); glVertex2f((5 + 38.0*i)/1728,height_unit*1.25);
+        glTexCoord2f(((float)i+1)/40+0.5,1); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*1.25);
+        glTexCoord2f(((float)i+1)/40+0.5,0); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*0.25);
     glEnd();
 }
 
@@ -145,10 +151,10 @@ void gl_tick_debug_window(void) {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glBegin(GL_POLYGON);
-        glTexCoord2f(0,0); glVertex2f(0.25/12,0.475);
-        glTexCoord2f(0,1); glVertex2f(0.25/12,0.975);
-        glTexCoord2f(1,1); glVertex2f(4.25/12,0.975);
-        glTexCoord2f(1,0); glVertex2f(4.25/12,0.475);
+        glTexCoord2f(0,0); glVertex2f(0.25/27,0.475);
+        glTexCoord2f(0,1); glVertex2f(0.25/27,0.975);
+        glTexCoord2f(1,1); glVertex2f(4.25/27,0.975);
+        glTexCoord2f(1,0); glVertex2f(4.25/27,0.475);
     glEnd();
     glTexImage2D(GL_TEXTURE_2D,0,3,256,256,0,GL_RGB, GL_UNSIGNED_BYTE, window_tilemap);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -156,10 +162,43 @@ void gl_tick_debug_window(void) {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glBegin(GL_POLYGON);
-        glTexCoord2f(0,0); glVertex2f(7.75/12,0.475);
-        glTexCoord2f(0,1); glVertex2f(7.75/12,0.975);
-        glTexCoord2f(1,1); glVertex2f(11.75/12,0.975);
-        glTexCoord2f(1,0); glVertex2f(11.75/12,0.475);
+        glTexCoord2f(0,0); glVertex2f(7.75/27,0.475);
+        glTexCoord2f(0,1); glVertex2f(7.75/27,0.975);
+        glTexCoord2f(1,1); glVertex2f(11.75/27,0.975);
+        glTexCoord2f(1,0); glVertex2f(11.75/27,0.475);
+    glEnd();
+    glTexImage2D(GL_TEXTURE_2D,0,3,256,32,0,GL_RGB, GL_UNSIGNED_BYTE, vram_block_3);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glBegin(GL_POLYGON);
+        glTexCoord2f(0,0); glVertex2f(39.0/72,04.0/64);
+        glTexCoord2f(0,1); glVertex2f(39.0/72,16.0/64);
+        glTexCoord2f(1,1); glVertex2f(71.0/72,16.0/64);
+        glTexCoord2f(1,0); glVertex2f(71.0/72,04.0/64);
+    glEnd();
+    glTexImage2D(GL_TEXTURE_2D,0,3,256,32,0,GL_RGB, GL_UNSIGNED_BYTE, vram_block_2);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glBegin(GL_POLYGON);
+        glTexCoord2f(0,0); glVertex2f(39.0/72,24.0/64);
+        glTexCoord2f(0,1); glVertex2f(39.0/72,36.0/64);
+        glTexCoord2f(1,1); glVertex2f(71.0/72,36.0/64);
+        glTexCoord2f(1,0); glVertex2f(71.0/72,24.0/64);
+    glEnd();
+    glTexImage2D(GL_TEXTURE_2D,0,3,256,32,0,GL_RGB, GL_UNSIGNED_BYTE, vram_block_1);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glBegin(GL_POLYGON);
+        glTexCoord2f(0,0); glVertex2f(39.0/72,44.0/64);
+        glTexCoord2f(0,1); glVertex2f(39.0/72,56.0/64);
+        glTexCoord2f(1,1); glVertex2f(71.0/72,56.0/64);
+        glTexCoord2f(1,0); glVertex2f(71.0/72,44.0/64);
     glEnd();
     glTexImage2D(GL_TEXTURE_2D,0,3,320,16,0,GL_RGB, GL_UNSIGNED_BYTE, object_tilemap);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -171,28 +210,73 @@ void gl_tick_debug_window(void) {
     }
 	glDisable(GL_TEXTURE_2D);
     char string[64];
-    sprintf(string, "LCDC      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF40)>>7)&1,(*(ram+0xFF40)>>6)&1,(*(ram+0xFF40)>>5)&1,(*(ram+0xFF40)>>4)&1,(*(ram+0xFF40)>>3)&1,(*(ram+0xFF40)>>2)&1,(*(ram+0xFF40)>>1)&1,(*(ram+0xFF40)>>0)&1);
-    draw_text(0.36,0.95, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "LCD Enable:    %s", ((*(ram+0xFF40)>>7)&1) ? "ON" : "OFF");
+    draw_text(0.16,0.96, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "Window Map:    %s", ((*(ram+0xFF40)>>6)&1) ? "9C00-9FFF" : "9800-9BFF");
+    draw_text(0.16,0.93, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "Window Enable: %s", ((*(ram+0xFF40)>>5)&1) ? "ON" : "OFF");
+    draw_text(0.16,0.90, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "W/BG Tiledata: %s", ((*(ram+0xFF40)>>4)&1) ? "8000-8FFF" : "8800-97FF");
+    draw_text(0.16,0.87, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "Backround Map: %s", ((*(ram+0xFF40)>>3)&1) ? "9C00-9FFF" : "9800-9BFF");
+    draw_text(0.16,0.84, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "OBJ Size:      %s", ((*(ram+0xFF40)>>2)&1) ? "8x8" : "8x16");
+    draw_text(0.16,0.81, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "OBJ Enable:    %s", ((*(ram+0xFF40)>>1)&1) ? "ON" : "OFF");
+    draw_text(0.16,0.78, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "W/BG Enable:   %s", ((*(ram+0xFF40)>>0)&1) ? "ON" : "OFF");
+    draw_text(0.16,0.75, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "LY | LYC  = 0x%.2x | 0x%.2x", *(ram+0xFF44), *(ram+0xFF45));
-    draw_text(0.36,0.9, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.72, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "STAT      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF41)>>7)&1,(*(ram+0xFF41)>>6)&1,(*(ram+0xFF41)>>5)&1,(*(ram+0xFF41)>>4)&1,(*(ram+0xFF41)>>3)&1,(*(ram+0xFF41)>>2)&1,(*(ram+0xFF41)>>1)&1,(*(ram+0xFF41)>>0)&1);
-    draw_text(0.36,0.85, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.69, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "SCX | SCY = 0x%.2x | 0x%.2x", *(ram+0xFF43), *(ram+0xFF42));
-    draw_text(0.36,0.80, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.66, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "WX+7 | WY = 0x%.2x | 0x%.2x", *(ram+0xFF4B), *(ram+0xFF4A));
-    draw_text(0.36,0.75, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.63, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "W Count   = 0x%.2x", window_internal_counter);
+    draw_text(0.16,0.60, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "BGP       = 0x%.2x", *(ram+0xFF47));
-    draw_text(0.36,0.70, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.57, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "OBP0|OBP1 = 0x%.2x | 0x%.2x", *(ram+0xFF48), *(ram+0xFF49));
-    draw_text(0.36,0.65, GLUT_BITMAP_9_BY_15, string);
+    draw_text(0.16,0.54, GLUT_BITMAP_9_BY_15, string);
 
+    draw_text(0.00222,0.4, GLUT_BITMAP_9_BY_15, "0x00");
+    draw_text(1.6/9,0.4, GLUT_BITMAP_9_BY_15, "0x08");
+    draw_text(3.2/9,0.4, GLUT_BITMAP_9_BY_15, "0x10");
+    draw_text(0.09111,0.19, GLUT_BITMAP_9_BY_15, "0x18");
+    draw_text(0.26888,0.19, GLUT_BITMAP_9_BY_15, "0x20");
 
-
-    draw_text(0.005,0.4, GLUT_BITMAP_9_BY_15, "0x00");
-    draw_text(0.4,0.4, GLUT_BITMAP_9_BY_15, "0x08");
-    draw_text(0.8,0.4, GLUT_BITMAP_9_BY_15, "0x10");
-    draw_text(0.205,0.19, GLUT_BITMAP_9_BY_15, "0x18");
-    draw_text(0.605,0.19, GLUT_BITMAP_9_BY_15, "0x20");
+    draw_text(0.505,54.0/64, GLUT_BITMAP_9_BY_15, "0x8000");
+    draw_text(0.505,51.0/64, GLUT_BITMAP_9_BY_15, "0x8200");
+    draw_text(0.505,48.0/64, GLUT_BITMAP_9_BY_15, "0x8400");
+    draw_text(0.505,45.0/64, GLUT_BITMAP_9_BY_15, "0x8600");
+    draw_text(0.505,34.0/64, GLUT_BITMAP_9_BY_15, "0x8800");
+    draw_text(0.505,31.0/64, GLUT_BITMAP_9_BY_15, "0x8A00");
+    draw_text(0.505,28.0/64, GLUT_BITMAP_9_BY_15, "0x8C00");
+    draw_text(0.505,25.0/64, GLUT_BITMAP_9_BY_15, "0x8E00");
+    draw_text(0.505,14.0/64, GLUT_BITMAP_9_BY_15, "0x9000");
+    draw_text(0.505,11.0/64, GLUT_BITMAP_9_BY_15, "0x9200");
+    draw_text(0.505,08.0/64, GLUT_BITMAP_9_BY_15, "0x9400");
+    draw_text(0.505,05.0/64, GLUT_BITMAP_9_BY_15, "0x9600");
+    for (float i=33; i<140; i+=40) {
+        draw_text(39.0/72,i/128, GLUT_BITMAP_9_BY_15, "000");
+        draw_text(41.0/72,i/128, GLUT_BITMAP_9_BY_15, "020");
+        draw_text(43.0/72,i/128, GLUT_BITMAP_9_BY_15, "040");
+        draw_text(45.0/72,i/128, GLUT_BITMAP_9_BY_15, "060");
+        draw_text(47.0/72,i/128, GLUT_BITMAP_9_BY_15, "080");
+        draw_text(49.0/72,i/128, GLUT_BITMAP_9_BY_15, "0A0");
+        draw_text(51.0/72,i/128, GLUT_BITMAP_9_BY_15, "0C0");
+        draw_text(53.0/72,i/128, GLUT_BITMAP_9_BY_15, "0E0");
+        draw_text(55.0/72,i/128, GLUT_BITMAP_9_BY_15, "100");
+        draw_text(57.0/72,i/128, GLUT_BITMAP_9_BY_15, "120");
+        draw_text(59.0/72,i/128, GLUT_BITMAP_9_BY_15, "140");
+        draw_text(61.0/72,i/128, GLUT_BITMAP_9_BY_15, "160");
+        draw_text(63.0/72,i/128, GLUT_BITMAP_9_BY_15, "180");
+        draw_text(65.0/72,i/128, GLUT_BITMAP_9_BY_15, "1A0");
+        draw_text(67.0/72,i/128, GLUT_BITMAP_9_BY_15, "1C0");
+        draw_text(69.0/72,i/128, GLUT_BITMAP_9_BY_15, "1E0");
+    }
     
     glColor3f(1,1,1);
     glPopMatrix();
@@ -219,8 +303,8 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
 
     //init main window
-    glutInitWindowSize(320,288);
-    glutInitWindowPosition(100,100);
+    glutInitWindowSize(160*3,144*3);
+    glutInitWindowPosition(100,20);
     memcpy(rom_name, rom_title, 16);
     WindowMain = glutCreateWindow(rom_name);
     glClearColor(0.0,0.0,0.0,0.0);
@@ -235,8 +319,8 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     
     //init debug menu
     if (debug_tilemap) {
-        glutInitWindowSize(768, 512);
-        glutInitWindowPosition(500,100);
+        glutInitWindowSize(1728, 512);
+        glutInitWindowPosition(0,500);
         WindowDebug = glutCreateWindow("Tilemaps and Objects");
         glClearColor(0.9,0.9,0.9,0.0);
         glShadeModel(GL_FLAT);
@@ -365,7 +449,7 @@ uint16_t interleave(uint16_t a, uint16_t b) {
 
 uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
     uint16_t base_addr;
-    if ((is_window_layer && (*(ram+0xFF40)&64)) || (!is_window_layer && (*(ram+0xFF40)&8))) {
+    if ((is_window_layer && (*(ram+0xFF40)&64)) || ((!is_window_layer) && (*(ram+0xFF40)&8))) {
         base_addr = 0x9C00;
     } else {
         base_addr = 0x9800;
@@ -375,9 +459,13 @@ uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
 
 uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
     /* get the memory address of a tile from the tile id and the addressing mode register */
-    uint16_t tile_addr = 0x8000 + ((uint16_t)(tile_id))*16;
-    if (!(is_object) && tile_id < 128 && !(*(ram+0xFF40)&16)) tile_addr += 0x1000; // swap addressing mode if tile isn't an object
-    return tile_addr;
+    if (is_object || (*(ram+0xFF40)&16)) { // UNSIGNED addressing from 0x8000
+        return 0x8000 + tile_id*16;
+    } else {// SIGNED addressing from 0x9000
+        tile_id ^= 128;
+        return 0x8800 + tile_id*16;
+        //return 0x9000 + (int8_t)(tile_id) * 16; // subtract (20*16)?
+    }
 }
 
 
@@ -414,10 +502,12 @@ void read_objects(void) {
                 .xflip = (bool)(flags & (1<<5)),
                 .palette = (bool)(flags & (1<<4))
             };
+            debug_used_objects[i] = 1;
             objects_found++;
         }
     }
 }
+
 
 uint8_t get_background_palette(uint8_t palette_value) {
     /* poll the BGP register */
@@ -445,6 +535,7 @@ int compare_obj_xvalue(const void *a, const void *b) {
 
 void draw_background() {
     /* Draw the background layer on the current scanline */
+    printf("SCANLINE %3d", *(ram+0xFF44));
     if ((*(ram+0xFF40)&1) == 0) { //bg is disabled
         for (int i=0; i<160; i++) {
             texture[143-*(ram+0xFF44)][i][0] = pixvals[0];
@@ -456,12 +547,18 @@ void draw_background() {
     uint8_t top = *(ram+0xFF44) + *(ram+0xFF42); //get scroll vals
     uint8_t left = *(ram+0xFF43);
     uint16_t tiles[21][8];
-    for (int i=0; i<21; i++) {
+    printf(" X = 0x%.2x | Y = 0x%.2x\n", left, top);
+    printf(" Selected tiles from row 0x%.2x\n", top>>3);
+    printf("TIDs:");
+    for (uint8_t i=0; i<21; i++) { // get tile id checks 0x0020 too high sometimes
         uint8_t tile_id = get_tile_id((left>>3)+i + (top>>3)*32, 0);
+        printf(" %.2x", tile_id);
         load_tile(tiles[i], get_tile_addr(tile_id, 0));
     }
-    for (int i=0; i<160; i++) {
-        uint8_t pix = (tiles[(i+left)>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
+    printf("\n");
+
+    for (uint8_t i=0; i<160; i++) {
+        uint8_t pix = (tiles[((i+left%8))>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
         bgw_priority_map[143-*(ram+0xFF44)][i] = (bool)pix;
         texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_palette(pix)];
         texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_palette(pix)];
@@ -474,13 +571,15 @@ void draw_window() {
     /* Draw the window layer on the current scanline */
     if ((*(ram+0xFF40)&0x21) == 0x21) { // Window Enable and BG/Window Enable bits are set
         if (*(ram+0xFF44) >= *(ram+0xFF4A)) { // when scanline >= window Y
+            bool pixel_drawn = 0;
             uint16_t tiles[21][8];
             for (int i=0; i<21; i++) {
                 uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 1);
                 load_tile(tiles[i], get_tile_addr(tile_id, 0));
             }
-            for (int screen_x_pos = *(ram+0xFF4A) - 7; screen_x_pos < 160; screen_x_pos++) {
-                uint8_t window_x_pos = screen_x_pos - (*(ram+0xFF4A) - 7);
+            for (int screen_x_pos = *(ram+0xFF4B) - 7; screen_x_pos < 160; screen_x_pos++) {
+                pixel_drawn = 1;
+                uint8_t window_x_pos = screen_x_pos - (*(ram+0xFF4B) - 7);
                 //screen_y_pos is *(ram+0xFF44)
                 //window_y_pos is window_internal_counter
 
@@ -492,7 +591,7 @@ void draw_window() {
                 texture[143-*(ram+0xFF44)][screen_x_pos][1] = pixvals[get_background_palette(pix)];
                 texture[143-*(ram+0xFF44)][screen_x_pos][2] = pixvals[get_background_palette(pix)];
             }
-            window_internal_counter++;
+            if (pixel_drawn) window_internal_counter++;
         }
     }
 }
@@ -500,9 +599,9 @@ void draw_window() {
 
 void draw_objects(void) {
     /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
-    if (((*(ram+0xFF40))&1) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
+    if (((*(ram+0xFF40))&2) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
         uint16_t tiles[20][8];
-        for (int8_t i = objects_found; i >= 0; i--) {
+        for (int8_t i = objects_found-1; i >= 0; i--) {
             if ((*(ram+0xFF40))&4) { // object 8x16 mode
                 load_tile(tiles[2*i], get_tile_addr(objects[i].tileid&0xFE, 1)); // &0xFE force-resets lower bit
                 load_tile(tiles[2*i+1], get_tile_addr(objects[i].tileid|0x01, 1)); // |0x01 force-sets lower bit
@@ -556,14 +655,14 @@ bool tick_graphics(void) {
     *(ram+0xFF41) &= 0xFB;
     *(ram+0xFF41) |= (*(ram+0xFF44) == *(ram+0xFF45))<<2; // set LY=LYC flag
 
-    // bool current_stat_state = (
-    //     ((*(ram+0xFF41)&0x40)   && ((*(ram+0xFF41)>>2)&1))   || // LY=LYC is set
-    //     (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
-    //     (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
-    //     (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
-    // );
-    // if ((!old_stat_state) && current_stat_state) {*(ram+0xFF0F) |= 2; printf("STAT interrupt!\n");} // Request a STAT interrupt
-    // old_stat_state = current_stat_state;
+    bool current_stat_state = (
+        ((*(ram+0xFF41)&0x40)   && ((*(ram+0xFF41)>>2)&1))   || // LY=LYC is set
+        (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
+        (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
+        (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
+    );
+    if ((!old_stat_state) && current_stat_state) {*(ram+0xFF0F) |= 2; printf("STAT interrupt!\n");} // Request a STAT interrupt
+    old_stat_state = current_stat_state;
 
     if (lcd_enable) {
         if (dot == 65564) { // enter VBLANK
@@ -579,10 +678,14 @@ bool tick_graphics(void) {
                 glutSetWindow(WindowDebug);
                 debug_tilemaps();
                 debug_sprites();
+                debug_vram(vram_block_1, 0x8000);
+                debug_vram(vram_block_2, 0x8800);
+                debug_vram(vram_block_3, 0x9000);
 
                 glutMainLoopEvent();
                 glutPostRedisplay();
                 glutSetWindow(WindowMain);
+                debug_frames_done++;
             }
             framerate();
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
@@ -598,9 +701,32 @@ bool tick_graphics(void) {
             draw_background();
             draw_window();
             draw_objects();
+            if (debug_tilemap) {
+                debug_tile_boundaries();
+            }
 
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 232) { // Enter Hblank
             *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
+
+            if (debug_frames_done >= debug_frameskip) {
+                getchar();
+                char x[1];
+                scanf("");
+            }
+            glutMainLoopEvent();
+            glutPostRedisplay();
+            if (debug_tilemap) {
+                glutSetWindow(WindowDebug);
+                debug_tilemaps();
+                debug_sprites();
+                debug_vram(vram_block_1, 0x8000);
+                debug_vram(vram_block_2, 0x8800);
+                debug_vram(vram_block_3, 0x9000);
+
+                glutMainLoopEvent();
+                glutPostRedisplay();
+                glutSetWindow(WindowMain);
+            }
         }
 
         dot++;
@@ -663,13 +789,18 @@ void debug_tilemaps(void) {
             debug_draw_background_tile(tile, window_tilemap, x, y);
         }
     }
-    for (int x=-1; x<161; x++) {
+    uint8_t bg_scanline = *(ram+0xFF44) + *(ram+0xFF42);
+
+    for (int x=0; x<161; x++) {
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
+        bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 0;
+        bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 255;
+        bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
     }
     for (int y=0; y<144; y++) {
         bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [0] = 255;
@@ -705,6 +836,59 @@ void debug_sprites(void) {
             debug_draw_sprite_tile(sprite, i, !object.yflip, object);
         } else {
             debug_draw_sprite_tile(blank, i, !object.yflip, object);
+        }
+        if (debug_used_objects[i]) debug_object_boundaries(i);
+    }
+}
+
+void debug_tile_boundaries(void) {
+    for (uint8_t x=0; x<160; x++) {
+        if (!((*(ram + 0xFF44) | x)&7)) {
+            texture[143-*(ram + 0xFF44)][x][0] = 255;
+            texture[143-*(ram + 0xFF44)][x][1] = 0;
+            texture[143-*(ram + 0xFF44)][x][2] = 0;
+        }
+    }
+}
+
+
+void debug_object_boundaries(uint8_t i) {
+    /* outline a sprite if it is used in the current scanline */
+    uint8_t max_y = (*(ram+0xFF40)&4) ? 0 : 8;
+    for (uint8_t x=0; x<8; x++) {
+        object_tilemap[max_y][i*8+x][0] = 255;
+        object_tilemap[max_y][i*8+x][1] = 0;
+        object_tilemap[max_y][i*8+x][2] = 0;
+        object_tilemap[15][i*8+x][0] = 255;
+        object_tilemap[15][i*8+x][1] = 0;
+        object_tilemap[15][i*8+x][2] = 0;
+    }
+    for (uint8_t y=max_y; y<15; y++) {
+        object_tilemap[y][i*8][0] = 255;
+        object_tilemap[y][i*8][1] = 0;
+        object_tilemap[y][i*8][2] = 0;
+        object_tilemap[y][i*8+7][0] = 255;
+        object_tilemap[y][i*8+7][1] = 0;
+        object_tilemap[y][i*8+7][2] = 0;
+    }
+    debug_used_objects[i] = 0;
+}
+
+
+void debug_vram(GLubyte block[32][256][3], uint16_t starting_addr) {
+    /* draw vram for debugging */
+    for (uint8_t i=0; i<4; i++) {
+        for (uint8_t j=0; j<32; j++) {
+            uint16_t tile[8];
+            load_tile(tile, starting_addr + (i*32+j)*16);
+            for (int v=0; v<8; v++) {
+                for (int u=0; u<8; u++) {
+                    uint8_t pix = (tile[v] >> (14-2*u))&3;
+                    block[31-(i*8+v)][j*8+u][0] = pixvals[get_background_palette(pix)];
+                    block[31-(i*8+v)][j*8+u][1] = pixvals[get_background_palette(pix)];
+                    block[31-(i*8+v)][j*8+u][2] = pixvals[get_background_palette(pix)];
+                }
+            }
         }
     }
 }

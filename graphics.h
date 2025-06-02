@@ -44,9 +44,9 @@ void debug_draw_background_tile(uint16_t tile[8], GLubyte tex_array[256][256][3]
 void debug_draw_sprite_tile(uint16_t tile[8], uint8_t base_x, uint8_t base_y, ObjectAttribute object);
 void debug_tilemaps(void);
 void debug_sprites(void);
-
-
-
+void debug_tile_boundaries(void);
+void debug_object_boundaries(uint8_t i);
+void debug_vram(GLubyte block[32][256][3], uint16_t starting_addr);
 
 
 
