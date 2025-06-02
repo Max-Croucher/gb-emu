@@ -39,7 +39,9 @@ bool stop_mode = 0;
 
 bool halt_on_breakpoint = 0; //extern
 bool print_breakpoints = 0; //extern
+bool dmg_colours = 0; //extern
 bool debug_tilemap = 0; //extern
+bool debug_scanlines = 0; //extern
 bool hyperspeed = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
@@ -69,6 +71,8 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--windowless")) no_display = 1;
         if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
         if (!strcmp(argv[i], "--tilemap")) debug_tilemap = 1;
+        if (!strcmp(argv[i], "--scanline")) {debug_tilemap = 1; debug_scanlines = 1;}
+        if (!strcmp(argv[i], "--green")) dmg_colours = 1;
     }
 }
 
