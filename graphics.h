@@ -20,6 +20,7 @@ typedef struct {
 void framerate(void);
 void gl_tick(void);
 void object_map_draw_quad(uint8_t i);
+void highlight_object(uint8_t i);
 void draw_text(float x, float y, void *font, const char* string);
 void gl_tick_debug_window(void);
 void reshape(int w, int h);
@@ -40,6 +41,7 @@ void draw_background(void);
 void draw_window(void);
 void draw_objects(void);
 bool tick_graphics(void);
+
 void debug_draw_background_tile(uint16_t tile[8], GLubyte tex_array[256][256][3], uint8_t base_x, uint8_t base_y);
 void debug_draw_sprite_tile(uint16_t tile[8], uint8_t base_x, uint8_t base_y, ObjectAttribute object);
 void debug_tilemaps(void);

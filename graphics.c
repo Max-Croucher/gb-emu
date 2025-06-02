@@ -115,7 +115,7 @@ void gl_tick(void) {
 
 
 void object_map_draw_quad(uint8_t i) {
-    /**/
+    /* draw an object's sprite on the tilemap debugger */
     float height_unit = 72.0/512;
     glBegin(GL_POLYGON);
         glTexCoord2f(((float)i)/40,0); glVertex2f((5 + 38.0*i)/1728,height_unit*1.75);
@@ -129,6 +129,33 @@ void object_map_draw_quad(uint8_t i) {
         glTexCoord2f(((float)i+1)/40+0.5,1); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*1.25);
         glTexCoord2f(((float)i+1)/40+0.5,0); glVertex2f((5 + 38.0*i + 36)/1728,height_unit*0.25);
     glEnd();
+}
+
+
+void highlight_object(uint8_t i) {
+    /* highlight a used object on the tilemap debugger */
+    char string[32];
+    sprintf(string, "%.2X,%.2X", *(ram + 0xFE01 + i*4), *(ram + 0xFE00 + i*4));
+    draw_text((5 + 38.0*(i%20))/1728,67.0/512*(i<20 ? 1.75 : 0.14), GLUT_BITMAP_HELVETICA_10, string);
+
+    float left = (5 + 38.0*(i%20))/1728;
+    float right = (5 + 38.0*(i%20)+36)/1728;
+    float bottom = 72.0/512*(i<20 ? 2.75 : 1.25);
+    float top;
+    if ((*(ram+0xFF40)>>2)&1) {
+        top = 72.0/512*(i<20 ? 1.75 : 0.25);
+    } else {
+        top = 72.0/512*(i<20 ? 2.25 : 0.75);
+    }
+
+    glColor3f(1, 0, 0); 
+    glBegin(GL_LINE_LOOP);
+        glVertex2f(left,  top); // XYZ left, top
+        glVertex2f(right, top); // XYZ right, top
+        glVertex2f(right, bottom); // XYZ right, bottom
+        glVertex2f(left,  bottom); // XYZ left, bottom
+    glEnd();
+
 }
 
 
@@ -220,25 +247,25 @@ void gl_tick_debug_window(void) {
     draw_text(0.16,0.87, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "Backround Map: %s", ((*(ram+0xFF40)>>3)&1) ? "9C00-9FFF" : "9800-9BFF");
     draw_text(0.16,0.84, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "OBJ Size:      %s", ((*(ram+0xFF40)>>2)&1) ? "8x8" : "8x16");
+    sprintf(string, "OBJ Size:      %s", ((*(ram+0xFF40)>>2)&1) ? "8x16" : "8x8");
     draw_text(0.16,0.81, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "OBJ Enable:    %s", ((*(ram+0xFF40)>>1)&1) ? "ON" : "OFF");
     draw_text(0.16,0.78, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "W/BG Enable:   %s", ((*(ram+0xFF40)>>0)&1) ? "ON" : "OFF");
     draw_text(0.16,0.75, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "LY | LYC  = 0x%.2x | 0x%.2x", *(ram+0xFF44), *(ram+0xFF45));
+    sprintf(string, "LY | LYC  = 0x%.2X | 0x%.2X", *(ram+0xFF44), *(ram+0xFF45));
     draw_text(0.16,0.72, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "STAT      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF41)>>7)&1,(*(ram+0xFF41)>>6)&1,(*(ram+0xFF41)>>5)&1,(*(ram+0xFF41)>>4)&1,(*(ram+0xFF41)>>3)&1,(*(ram+0xFF41)>>2)&1,(*(ram+0xFF41)>>1)&1,(*(ram+0xFF41)>>0)&1);
     draw_text(0.16,0.69, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "SCX | SCY = 0x%.2x | 0x%.2x", *(ram+0xFF43), *(ram+0xFF42));
+    sprintf(string, "SCX | SCY = 0x%.2X | 0x%.2X", *(ram+0xFF43), *(ram+0xFF42));
     draw_text(0.16,0.66, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "WX+7 | WY = 0x%.2x | 0x%.2x", *(ram+0xFF4B), *(ram+0xFF4A));
+    sprintf(string, "WX+7 | WY = 0x%.2X | 0x%.2X", *(ram+0xFF4B), *(ram+0xFF4A));
     draw_text(0.16,0.63, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "W Count   = 0x%.2x", window_internal_counter);
+    sprintf(string, "W Count   = 0x%.2X", window_internal_counter);
     draw_text(0.16,0.60, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "BGP       = 0x%.2x", *(ram+0xFF47));
+    sprintf(string, "BGP       = 0x%.2X", *(ram+0xFF47));
     draw_text(0.16,0.57, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "OBP0|OBP1 = 0x%.2x | 0x%.2x", *(ram+0xFF48), *(ram+0xFF49));
+    sprintf(string, "OBP0|OBP1 = 0x%.2X | 0x%.2X", *(ram+0xFF48), *(ram+0xFF49));
     draw_text(0.16,0.54, GLUT_BITMAP_9_BY_15, string);
 
     draw_text(0.00222,0.4, GLUT_BITMAP_9_BY_15, "0x00");
@@ -292,6 +319,13 @@ void gl_tick_debug_window(void) {
         }
     }
 
+    for (int i=0; i<40; i++) {
+        if (debug_used_objects[i]) {
+            highlight_object(i);
+            debug_used_objects[i] = 0;
+        }
+    }
+
     glColor3f(1,1,1);
     glutSwapBuffers();
 }
@@ -332,7 +366,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     
     //init debug menu
     if (debug_tilemap) {
-        glutInitWindowSize(1728, 512);
+        glutInitWindowSize(1729, 513);
         glutInitWindowPosition(0,500);
         WindowDebug = glutCreateWindow("Tilemaps and Objects");
         glClearColor(0.9,0.9,0.9,0.0);
@@ -484,7 +518,7 @@ uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
     } else {// SIGNED addressing from 0x9000
         tile_id ^= 128;
         return 0x8800 + tile_id*16;
-        //return 0x9000 + (int8_t)(tile_id) * 16; // subtract (20*16)?
+        //return 0x9000 + (int8_t)(tile_id) * 16;
     }
 }
 
@@ -564,7 +598,7 @@ void draw_background() {
     uint8_t top = *(ram+0xFF44) + *(ram+0xFF42); //get scroll vals
     uint8_t left = *(ram+0xFF43);
     uint16_t tiles[21][8];
-    for (uint8_t i=0; i<21; i++) { // get tile id checks 0x0020 too high sometimes
+    for (uint8_t i=0; i<21; i++) {
         uint8_t tile_id = get_tile_id((((left>>3)+i)%32) + (top>>3)*32, 0);
         load_tile(tiles[i], get_tile_addr(tile_id, 0));
     }
@@ -868,22 +902,18 @@ void debug_tile_boundaries(void) {
 void debug_object_boundaries(uint8_t i) {
     /* outline a sprite if it is used in the current scanline */
     uint8_t max_y = (*(ram+0xFF40)&4) ? 0 : 8;
-    for (uint8_t x=0; x<8; x++) {
-        object_tilemap[max_y][i*8+x][0] = 255;
-        object_tilemap[max_y][i*8+x][1] = 0;
-        object_tilemap[max_y][i*8+x][2] = 0;
-        object_tilemap[15][i*8+x][0] = 255;
-        object_tilemap[15][i*8+x][1] = 0;
-        object_tilemap[15][i*8+x][2] = 0;
-    }
-    for (uint8_t y=max_y; y<15; y++) {
-        object_tilemap[y][i*8][0] = 255;
-        object_tilemap[y][i*8][1] = 0;
-        object_tilemap[y][i*8][2] = 0;
-        object_tilemap[y][i*8+7][0] = 255;
-        object_tilemap[y][i*8+7][1] = 0;
-        object_tilemap[y][i*8+7][2] = 0;
-    }
+    object_tilemap[max_y][i*8][0] = 255;
+    object_tilemap[max_y][i*8][1] = 0;
+    object_tilemap[max_y][i*8][2] = 0;
+    object_tilemap[max_y][i*8+7][0] = 255;
+    object_tilemap[max_y][i*8+7][1] = 0;
+    object_tilemap[max_y][i*8+7][2] = 0;
+    object_tilemap[15][i*8][0] = 255;
+    object_tilemap[15][i*8][1] = 0;
+    object_tilemap[15][i*8][2] = 0;
+    object_tilemap[15][i*8+7][0] = 255;
+    object_tilemap[15][i*8+7][1] = 0;
+    object_tilemap[15][i*8+7][2] = 0;
     debug_used_objects[i] = 0;
 }
 

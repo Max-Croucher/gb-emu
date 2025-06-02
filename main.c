@@ -65,8 +65,8 @@ extern uint8_t current_instruction_count;
 void decode_launch_args(int argc, char *argv[]) {
     /* read argv to set launch arguments */
     for (int i=2; i<argc; i++) {
-        if (!strcmp(argv[i], "--halt-on-breakpoints")) halt_on_breakpoint = 1;
-        if (!strcmp(argv[i], "--print-breakpoints")) print_breakpoints = 1;
+        if (!strcmp(argv[i], "--halt-on-breakpoint")) halt_on_breakpoint = 1;
+        if (!strcmp(argv[i], "--print-breakpoint")) print_breakpoints = 1;
         if (!strcmp(argv[i], "--max-speed")) hyperspeed = 1;
         if (!strcmp(argv[i], "--windowless")) no_display = 1;
         if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
