@@ -94,7 +94,7 @@ void load_interrupt_instructions(uint8_t isr) {
     addr = 0x40+(isr<<3);
     scheduled_instructions[0] = &machine_idle;
     scheduled_instructions[1] = &machine_dec_sp;
-    scheduled_instructions[2] = &machine_push_r16_high_dec_sp;
+    scheduled_instructions[2] = &machine_interrupt_push_r16_high_dec_sp;
     scheduled_instructions[3] = &machine_push_r16_low;
     scheduled_instructions[4] = &machine_set_pc_addr;
     num_scheduled_instructions = 5;
@@ -239,6 +239,28 @@ static void machine_push_r16_low_set_r16_WZ(void) {
 static void machine_push_r16_low(void) {
     /* push r16 low to stack*/
     write_byte(reg.SP, get_r16(r16)&0xFF);
+}
+
+
+static void machine_interrupt_push_r16_high_dec_sp(void) {
+    /* Handle pushing PCH to stack during interrupt handling, but test if IE is written to */
+    write_byte(reg.SP, get_r16(r16)>>8);
+    if (reg.SP == 0xFFFF) {
+        uint8_t isr = (addr - 0x40)>>3; // recover which interrupt was scheduled
+        if (!(*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F)) { // an interrupt is no longer pending!
+            addr = 0x0000;
+        } else { // a different interrupt will be triggered instead!
+            for (uint8_t new_isr=0; new_isr<5; new_isr++) {
+                if ((*(ram+0xFF0F)&*(ram+0xFFFF)&(1<<new_isr))) {
+                    addr = 0x40 + (new_isr<<3);
+                    *(ram+0xFF0F) &= ~(1<<new_isr); // disable new IF bit
+                }
+            }
+        }
+        *(ram+0xFF0F) |= (1<<isr); // re-enable IF bit
+
+    }
+    reg.SP--;
 }
 
 

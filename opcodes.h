@@ -30,6 +30,7 @@ static void machine_load_sp_hl(void);
 static void machine_push_r16_high_dec_sp(void);
 static void machine_push_r16_low_set_r16_WZ(void);
 static void machine_push_r16_low(void);
+static void machine_interrupt_push_r16_high_dec_sp(void);
 static void machine_pop_Z_inc_sp(void);
 static void machine_pop_W_inc_sp(void);
 static void machine_inc_addr(void);
