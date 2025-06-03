@@ -884,7 +884,6 @@ void debug_sprites(void) {
         } else {
             debug_draw_sprite_tile(blank, i, !object.yflip, object);
         }
-        if (debug_used_objects[i]) debug_object_boundaries(i);
     }
 }
 
@@ -896,25 +895,6 @@ void debug_tile_boundaries(void) {
             texture[143-*(ram + 0xFF44)][x][2] = 0;
         }
     }
-}
-
-
-void debug_object_boundaries(uint8_t i) {
-    /* outline a sprite if it is used in the current scanline */
-    uint8_t max_y = (*(ram+0xFF40)&4) ? 0 : 8;
-    object_tilemap[max_y][i*8][0] = 255;
-    object_tilemap[max_y][i*8][1] = 0;
-    object_tilemap[max_y][i*8][2] = 0;
-    object_tilemap[max_y][i*8+7][0] = 255;
-    object_tilemap[max_y][i*8+7][1] = 0;
-    object_tilemap[max_y][i*8+7][2] = 0;
-    object_tilemap[15][i*8][0] = 255;
-    object_tilemap[15][i*8][1] = 0;
-    object_tilemap[15][i*8][2] = 0;
-    object_tilemap[15][i*8+7][0] = 255;
-    object_tilemap[15][i*8+7][1] = 0;
-    object_tilemap[15][i*8+7][2] = 0;
-    debug_used_objects[i] = 0;
 }
 
 
