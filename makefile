@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -O4 -g
+CFLAGS= -O4
 
 all: gbemu
 

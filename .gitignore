@@ -3,6 +3,7 @@
 !*.c
 !*.h
 !*.py
-!nops.gb
-!stacks.gb
 !makefile
+!*.md
+*old.c
+*old.h
