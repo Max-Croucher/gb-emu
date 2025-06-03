@@ -272,9 +272,8 @@ void set_isr_enable(uint8_t isr_type, bool state) {
 
 void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
-    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) { // Most of the bus is inaccessible during DMA
-        if (addr!= 0xFF46) return; 
-    }
+    if (OAM_DMA  && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM is inaccessible during DMA
+
     if (addr == 0xFF46) { // enter DMA mode
         *(ram+addr) = byte;
         printf("DMA: Scheduled start at sysclk=%.4x\n", system_counter);
@@ -355,10 +354,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
 uint8_t read_byte(uint16_t addr) {
     /* Read a byte from a particular address. Returns 0xFF on a read-protected register */
-    if (OAM_DMA && (addr < 0xFF80 || addr >= 0xFFFE)) { // Most of the bus is inaccessible during DMA
-        if (addr == 0xFF46) return *(ram+addr); 
-        return 0xFF;
-    }
+    if (OAM_DMA  && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM is inaccessible during DMA
     if (addr < 0x8000) return read_rom(addr); // Read from ROM
 
     if (addr >= 0xA000 && addr < 0xC000) { // Reading from external RAM
@@ -413,8 +409,8 @@ uint8_t read_dma(void) {
         if (high_addr >= 0xE0) high_addr -= 0x20;
         *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (high_addr<<8) + OAM_DMA_timeout);
     }
-    OAM_DMA_timeout++;
     if (OAM_DMA_timeout==160) OAM_DMA = 0;
+    OAM_DMA_timeout++;
 }
 
 

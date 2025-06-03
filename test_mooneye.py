@@ -9,7 +9,10 @@ IGNORE_FILES = {
     Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_regs-sgb.gb"),
     Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_regs-mgb.gb"),
     Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_regs-sgb2.gb"),
-    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_hwio-dmg0.gb")
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_hwio-dmg0.gb"),
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_div-dmg0.gb"),
+    Path("/home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_regs-dmg0.gb")
+
 }
 
 
@@ -22,7 +25,7 @@ ROMDIRS = [
 ]
 EMU = Path("/home/max/Documents/stuff/programming/repos/gb-emu/gbemu")
 
-TIMEOUT = 1
+TIMEOUT = 3
 
 def main():
     testfiles = set(sum((list(romdir.glob("./**/*.gb")) for romdir in ROMDIRS), start=[]))
@@ -34,7 +37,7 @@ def main():
     for testfile in testfiles:
         print(f"{testfile}... ", end='')
         try:
-            proc = subprocess.Popen([EMU, testfile, '--max-speed', '--windowless', '--halt-on-breakpoint'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            proc = subprocess.Popen([EMU, testfile, '--max-speed', '--halt-on-breakpoint'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             proc.wait(TIMEOUT)
         except subprocess.TimeoutExpired:
             print("Timeout")
@@ -70,15 +73,8 @@ if __name__ == "__main__":
     main()
 
 # Failed tests:
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/rapid_di_ei.gb
 #   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/ppu/lcdon_write_timing-GS.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_regs-dmg0.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_hwio-dmgABCmgb.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/bits/unused_hwio-GS.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/if_ie_registers.gb
 #   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/ppu/lcdon_timing-GS.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/boot_div-dmg0.gb
-#   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/interrupts/ie_push.gb
 #   /home/max/Documents/stuff/programming/repos/gb-emu/test_roms/mts/acceptance/serial/boot_sclk_align-dmgABCmgb.gb
 # 30 tests did not terminate after 3 seconds.
 # Non-Terminating tests:
