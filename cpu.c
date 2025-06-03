@@ -342,11 +342,12 @@ void write_byte(uint16_t addr, uint8_t byte) {
     // if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
     // if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
-    // if (addr > 0xFF00) { //Special instructions
-    //     uint8_t mask = write_masks[addr&0xFF];
-    //     *(ram+addr) &= ~mask; // set to-be-written bits low
-    //     *(ram+addr) |= byte&mask; // write only the masked bits
-    // }
+    if (addr >= 0xFF00) { //Special instructions
+        uint8_t mask = write_masks[addr&0xFF];
+        *(ram+addr) &= ~mask; // set to-be-written bits low
+        *(ram+addr) |= byte&mask; // write only the masked bits
+        return;
+    }
 
     *(ram+addr) = byte; // write if nothing else happens
 }
@@ -366,13 +367,10 @@ uint8_t read_byte(uint16_t addr) {
 
     if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
     if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
-    //if (addr == 0xFF05) printf("Reading TIMA at sysclk=0x%.4x. Got 0x%.2x\n", system_counter, *(ram+addr));
+
     if (addr == 0xFF04) { //reading DIV
         return system_counter>>8;
     }
-    // if (addr > 0xFF00) { //Special instructions
-    //     return *(ram+addr) | (write_masks[addr&0xFF]); // set unreadable bits high
-    // }
 
     if (addr == 0xFF00) { //reading joypad
         joypad_io();
@@ -380,6 +378,10 @@ uint8_t read_byte(uint16_t addr) {
     }
 
     if (addr == 0xFF4D) return 0xFF; //KEY0 in DMG mode
+
+    if (addr >= 0xFF00) { //Special instructions
+        return *(ram+addr) | (read_masks[addr&0xFF]); // set unreadable bits high
+    }
 
     return *(ram+addr);
 }
@@ -429,26 +431,4 @@ void joypad_io(void) {
     if (old_state & ~(*(ram+0xFF00) & 0x0F)) {// if any bits were high and are now low
         *(ram+0xFF0F) |= 16; // Request a joypad interrupt
     }
-
-
-    // switch ((*(ram+0xFF00)>>4)&3)
-    // {
-    // case 3:
-    //     *(ram+0xFF00) |=0x0F;
-    //     fprintf(stderr, "none\n");
-    //     break;
-    // case 2:
-    //     fprintf(stderr, "dpad\n");
-    //     *(ram+0xFF00) &=0xF0;
-    //     *(ram+0xFF00) |= (!joypad_state.down<<3) + (!joypad_state.up<<2) + (!joypad_state.left<<1) + (!joypad_state.right);
-    //     break;
-    // case 1:
-    //     fprintf(stderr, "face\n");
-    //     *(ram+0xFF00) &=0xF0;
-    //     *(ram+0xFF00) |= (!joypad_state.select<<3) + (!joypad_state.start<<2) + (!joypad_state.B<<1) + (!joypad_state.A);
-    //     break;
-    // case 0:
-    //     fprintf(stderr, "face\n");
-        
-    // }
 }

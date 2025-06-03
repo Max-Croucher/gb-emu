@@ -8,8 +8,8 @@ registers = {
     0x04: ('bbbbbbbb', 'DIV', 0xAB),
     0x05: ('bbbbbbbb', 'TIMA', 0x00),
     0x06: ('bbbbbbbb', 'TMA', 0x00),
-    0x07: ('bbbbbbbb', 'TAC', 0xF8),
-    0x0F: ('bbbbbbbb', 'IF', 0xE1),
+    0x07: ('xxxxxbbb', 'TAC', 0xF8),
+    0x0F: ('xxxbbbbb', 'IF', 0xE1),
     0x10: ('xbbbbbbb', 'NR10', 0x80),
     0x11: ('bbwwwwww', 'NR11', 0xBF),
     0x12: ('bbbbbbbb', 'NR12', 0xF3),
@@ -19,9 +19,9 @@ registers = {
     0x17: ('bbbbbbbb', 'NR22', 0x00),
     0x18: ('wwwwwwww', 'NR23', 0xFF),
     0x19: ('wbxxxwww', 'NR24', 0xBF),
-    0x1A: ('bbbbbbbb', 'NR30', 0x7F),
+    0x1A: ('bxxxxxxx', 'NR30', 0x7F),
     0x1B: ('wwwwwwww', 'NR31', 0xFF),
-    0x1C: ('bbbbbbbb', 'NR32', 0x9F),
+    0x1C: ('xbbxxxxx', 'NR32', 0x9F),
     0x1D: ('wwwwwwww', 'NR33', 0xFF),
     0x1E: ('wbxxxwww', 'NR34', 0xBF),
     0x20: ('wwwwwwww', 'NR41', 0xFF),
@@ -31,22 +31,22 @@ registers = {
     0x24: ('bbbbbbbb', 'NR50', 0x77),
     0x25: ('bbbbbbbb', 'NR51', 0xF3),
     0x26: ('bxxxrrrr', 'NR52', 0xF1),
-    0x30: ('bbbbbbbb', 'WAVE 1', 0xFF),
-    0x31: ('bbbbbbbb', 'WAVE 2', 0xFF),
-    0x32: ('bbbbbbbb', 'WAVE 3', 0xFF),
-    0x33: ('bbbbbbbb', 'WAVE 4', 0xFF),
-    0x34: ('bbbbbbbb', 'WAVE 5', 0xFF),
-    0x35: ('bbbbbbbb', 'WAVE 6', 0xFF),
-    0x36: ('bbbbbbbb', 'WAVE 7', 0xFF),
-    0x37: ('bbbbbbbb', 'WAVE 8', 0xFF),
-    0x38: ('bbbbbbbb', 'WAVE 9', 0xFF),
-    0x39: ('bbbbbbbb', 'WAVE 10', 0xFF),
-    0x3A: ('bbbbbbbb', 'WAVE 11', 0xFF),
-    0x3B: ('bbbbbbbb', 'WAVE 12', 0xFF),
-    0x3C: ('bbbbbbbb', 'WAVE 13', 0xFF),
-    0x3D: ('bbbbbbbb', 'WAVE 14', 0xFF),
-    0x3E: ('bbbbbbbb', 'WAVE 15', 0xFF),
-    0x3F: ('bbbbbbbb', 'WAVE 16', 0xFF),
+    0x30: ('bbbbbbbb', 'WAVE1', 0xFF),
+    0x31: ('bbbbbbbb', 'WAVE2', 0xFF),
+    0x32: ('bbbbbbbb', 'WAVE3', 0xFF),
+    0x33: ('bbbbbbbb', 'WAVE4', 0xFF),
+    0x34: ('bbbbbbbb', 'WAVE5', 0xFF),
+    0x35: ('bbbbbbbb', 'WAVE6', 0xFF),
+    0x36: ('bbbbbbbb', 'WAVE7', 0xFF),
+    0x37: ('bbbbbbbb', 'WAVE8', 0xFF),
+    0x38: ('bbbbbbbb', 'WAVE9', 0xFF),
+    0x39: ('bbbbbbbb', 'WAVE10', 0xFF),
+    0x3A: ('bbbbbbbb', 'WAVE11', 0xFF),
+    0x3B: ('bbbbbbbb', 'WAVE12', 0xFF),
+    0x3C: ('bbbbbbbb', 'WAVE13', 0xFF),
+    0x3D: ('bbbbbbbb', 'WAVE14', 0xFF),
+    0x3E: ('bbbbbbbb', 'WAVE15', 0xFF),
+    0x3F: ('bbbbbbbb', 'WAVE16', 0xFF),
     0x40: ('bbbbbbbb', 'LCDC', 0x91),
     0x41: ('xbbbbrrr', 'STAT', 0x85),
     0x42: ('bbbbbbbb', 'SCY', 0x00),
@@ -59,7 +59,7 @@ registers = {
     0x49: ('bbbbbbbb', 'OBP1', 0xFF),
     0x4A: ('bbbbbbbb', 'WX', 0x00),
     0x4B: ('bbbbbbbb', 'WY', 0x00),
-    0xFF: ('bbbbbbbb', 'IE', 0x00)
+    0xFF: ('xxxbbbbb', 'IE', 0xE0)
 }
 
 outfile = open("registers.h", 'w')
@@ -72,11 +72,20 @@ outfile.write("""/* Header file to encode which DMG registers are read and write
 
 #ifndef REGISTERS_H
 #define REGISTERS_H
+
+""")
+
+# for i in range(256):
+#     _, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
+#     if regname is not None:
+#         outfile.write(f"#define R_{regname.upper():<6} 0x{i:0>2x}\n")
+
+outfile.write("""
 uint8_t write_masks[256] = { // for each byte, a '1' means a bit is writable
 """)
 
 for i in range(256):
-    bitmask, regname, _ = registers.get(i, ("xxxxxxxx", None, None))
+    bitmask, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
     bitmask = bitmask.replace('b', '1')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')
@@ -86,7 +95,7 @@ for i in range(256):
 outfile.write("};\n\nuint8_t read_masks[256] = { // for each byte, a '0' means a bit is readable\n")
 
 for i in range(256):
-    bitmask, regname, _ = registers.get(i, ("xxxxxxxx", None, None))
+    bitmask, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
     bitmask = bitmask.replace('b', '0')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')
@@ -98,7 +107,7 @@ print("uint8_t initial_registers[256] = {")
 for i in range(256):
     if i % 16 == 0:
         print("   ", end='')
-    bitmask, _, initial =  registers.get(i, ("xxxxxxxx", None, 0xFF));
+    bitmask, _, initial =  registers.get(i, ("bbbbbbbb", None, 0xFF));
     bitmask = bitmask.replace('b', '0')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')

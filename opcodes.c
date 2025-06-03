@@ -18,7 +18,7 @@ extern uint16_t system_counter;
 extern bool halt_on_breakpoint;
 extern bool print_breakpoints;
 extern bool LOOP;
-bool do_ei_set = 0; //extern
+int8_t do_ei_set = 0; //extern
 uint8_t do_haltmode = 0; //extern
 void (*scheduled_instructions[10])(void); //extern
 uint8_t num_scheduled_instructions = 0; //extern
@@ -766,6 +766,7 @@ static void machine_ime_enable_late(void) {
 static void machine_ime_disable(void) {
     /* disable IME (happens on time) */
     set_ime(0);
+    do_ei_set = -1;
     reg.PC++;
 }
 
@@ -773,14 +774,14 @@ static void machine_ime_disable(void) {
 static void machine_stop(void) {
     /* handle entering STOP mode */
     if ((*(ram+0xFF00)&0x0F)<0xF) { //button is being held
-        if (*(ram+0xFF0F)&*(ram+0xFFFF)) { // interrupt is pending
+        if (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F) { // interrupt is pending
             reg.PC++; // stop is 1-byte, no HALT, no DIV reset
         } else {
             reg.PC += 2;
             do_haltmode = 1; // stop is 2-byte, HALT mode, no DIV reset
         }
     } else {
-        if (*(ram+0xFF0F)&*(ram+0xFFFF)) {
+        if (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F) {
             reg.PC++;
             do_haltmode = 2;
             *(ram+0xFF04) = 0; // stop is 1-byte, STOP mode, DIV reset

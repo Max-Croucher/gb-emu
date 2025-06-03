@@ -55,7 +55,7 @@ extern bool OAM_DMA;
 extern uint8_t OAM_DMA_starter;
 extern bool OAM_DMA_timeout;
 extern bool TIMA_overflow_flag;
-extern bool do_ei_set;
+extern int8_t do_ei_set;
 extern uint8_t do_haltmode;
 extern void (*scheduled_instructions[10])(void);
 extern uint8_t num_scheduled_instructions;
@@ -80,7 +80,7 @@ void decode_launch_args(int argc, char *argv[]) {
 bool service_interrupts(void) {
     /* Check if an interrupt is due, moving execution if necessary */
     if (reg.IME) { // IME must be set
-        uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF);
+        uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF)&0x1F;
         for (int isr=0; isr<5; isr++) { //Check for each of the 5 interrupts
             if (available_regs & 1<<isr) {
                 *(ram+0xFF0F) &= ~(uint8_t)(1<<isr); //disable IF
@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
                         ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
                     );
 
-                    if (halt_state && (*(ram+0xFF0F)&*(ram+0xFFFF))) { //An interrupt is now pending to quit HALT
+                    if (halt_state && (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F)) { //An interrupt is now pending to quit HALT
                         halt_state = 0;
                     }
                     if (!halt_state) service_interrupts();
@@ -179,9 +179,12 @@ int main(int argc, char *argv[]) {
                         }
                         do_haltmode = 0;
                     }
-                    if (do_ei_set && (do_ei == 0)) {
+                    if ((do_ei_set==1) && (do_ei == 0)) {
                         do_ei = 2;
                         do_ei_set = 0;
+                    } else if (do_ei_set == -1) {
+                        do_ei_set = 0;
+                        do_ei = 0;
                     }
                 }
                 TIMA_overflow_flag = 0;
