@@ -58,9 +58,11 @@ registers = {
     0x48: ('bbbbbbbb', 'OBP0', 0xFF),
     0x49: ('bbbbbbbb', 'OBP1', 0xFF),
     0x4A: ('bbbbbbbb', 'WX', 0x00),
-    0x4B: ('bbbbbbbb', 'WY', 0x00),
-    0xFF: ('xxxbbbbb', 'IE', 0xE0)
+    0x4B: ('bbbbbbbb', 'WY', 0x00)
+#    0xFF: ('bbbbbbbb', 'IE', 0xE0)
 }
+
+SIZE = 128
 
 outfile = open("registers.h", 'w')
 
@@ -75,45 +77,45 @@ outfile.write("""/* Header file to encode which DMG registers are read and write
 
 """)
 
-# for i in range(256):
-#     _, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
+# for i in range(SIZE):
+#     _, regname, _ = registers.get(i, ("xxxxxxxx", None, None))
 #     if regname is not None:
 #         outfile.write(f"#define R_{regname.upper():<6} 0x{i:0>2x}\n")
 
-outfile.write("""
-uint8_t write_masks[256] = { // for each byte, a '1' means a bit is writable
+outfile.write(f"""
+uint8_t write_masks[{SIZE}] = {{ // for each byte, a '1' means a bit is writable
 """)
 
-for i in range(256):
-    bitmask, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
+for i in range(SIZE):
+    bitmask, regname, _ = registers.get(i, ("xxxxxxxx", None, None))
     bitmask = bitmask.replace('b', '1')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')
     bitmask = bitmask.replace('x', '0')
-    outfile.write(f"    0b{bitmask}{'' if i==255 else ','}{(' // ' + regname) if regname is not None else ''}\n")
+    outfile.write(f"    0b{bitmask}{'' if i==SIZE-1 else ','}{(' // ' + regname) if regname is not None else ''}\n")
 
-outfile.write("};\n\nuint8_t read_masks[256] = { // for each byte, a '0' means a bit is readable\n")
+outfile.write(f"}};\n\nuint8_t read_masks[{SIZE}] = {{ // for each byte, a '0' means a bit is readable\n")
 
-for i in range(256):
-    bitmask, regname, _ = registers.get(i, ("bbbbbbbb", None, None))
+for i in range(SIZE):
+    bitmask, regname, _ = registers.get(i, ("xxxxxxxx", None, None))
     bitmask = bitmask.replace('b', '0')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')
     bitmask = bitmask.replace('x', '1')
-    outfile.write(f"    0b{bitmask}{'' if i==255 else ','}{(' // ' + regname) if regname is not None else ''}\n")
+    outfile.write(f"    0b{bitmask}{'' if i==SIZE-1 else ','}{(' // ' + regname) if regname is not None else ''}\n")
 outfile.write("};\n#endif //REGISTERS\n")
 
-print("uint8_t initial_registers[256] = {")
-for i in range(256):
+print(f"uint8_t initial_registers[{SIZE}] = {{")
+for i in range(SIZE):
     if i % 16 == 0:
         print("   ", end='')
-    bitmask, _, initial =  registers.get(i, ("bbbbbbbb", None, 0xFF));
+    bitmask, _, initial =  registers.get(i, ("xxxxxxxx", None, 0xFF));
     bitmask = bitmask.replace('b', '0')
     bitmask = bitmask.replace('w', '1')
     bitmask = bitmask.replace('r', '0')
     bitmask = bitmask.replace('x', '1')
     bit = int(bitmask, base=2)
-    print(f" 0x{(bit | initial):0>2x}{' ' if i == 255 else ','}", end='')
+    print(f" 0x{(bit | initial):0>2x}{' ' if i == SIZE-1 else ','}", end='')
     if i % 16 == 15:
         print(f" // 0x0{i//16:x}")
 print('};')

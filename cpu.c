@@ -342,7 +342,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
     // if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
     // if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
-    if (addr >= 0xFF00) { //Special instructions
+    if (addr >= 0xFF00 && addr < 0xFF80) { //Special instructions
         uint8_t mask = write_masks[addr&0xFF];
         *(ram+addr) &= ~mask; // set to-be-written bits low
         *(ram+addr) |= byte&mask; // write only the masked bits
@@ -379,7 +379,7 @@ uint8_t read_byte(uint16_t addr) {
 
     if (addr == 0xFF4D) return 0xFF; //KEY0 in DMG mode
 
-    if (addr >= 0xFF00) { //Special instructions
+    if (addr >= 0xFF00 && addr < 0xFF80) { //Special instructions
         return *(ram+addr) | (read_masks[addr&0xFF]); // set unreadable bits high
     }
 
