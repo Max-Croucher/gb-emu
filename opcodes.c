@@ -122,6 +122,7 @@ static void machine_consume_prefix() {
     reg.PC++;
     r8 = read_byte(reg.PC)&7;
     addr = reg.HL;
+    r16 = R16HL;
     W = (read_byte(reg.PC)>>3)&7;
 }
 
@@ -158,6 +159,66 @@ static void machine_load_r8_Z(void) {
 static void machine_load_Z_r8(void) {
     /* load into Z from register r8 */
     Z = get_r8(r8);
+}
+
+
+static void machine_load_Z_r16(void) {
+    /* load into Z from the byte pointed to by register r16 */
+    Z = read_byte(get_r16(r16));
+}
+
+
+static void machine_load_r16_Z(void) {
+    /* load into the byte pointed to by register r16 from Z */
+    write_byte(get_r16(r16), Z);
+}
+
+
+static void machine_load_dec_Z_r16(void) {
+/* load into Z from the byte pointed to by r16, and decrement r16 */
+    Z = read_byte(get_r16(r16));
+    set_r16(r16, get_r16(r16)-1);
+}
+
+
+static void machine_load_inc_Z_r16(void) {
+/* load into Z from the byte pointed to by r16, and increment r16 */
+    Z = read_byte(get_r16(r16));
+    set_r16(r16, get_r16(r16)+1);
+}
+
+
+static void machine_load_dec_r16_r8(void) {
+/* load into byte pointed to by r16 from r8, and decrement r16 */
+    write_byte(get_r16(r16), get_r8(r8));
+    set_r16(r16, get_r16(r16)-1);
+}
+
+
+static void machine_load_inc_r16_r8(void) {
+/* load into byte pointed to by r16 from r8, and increment r16 */
+    write_byte(get_r16(r16), get_r8(r8));
+    set_r16(r16, get_r16(r16)+1);
+}
+
+
+static void machine_load_hl_Z_dec(void) {
+    /* load into byte pointed to by hl from Z, decremented */
+    Z--;
+    write_byte(get_r16(R16HL), Z);
+    set_flag(NFLAG, 1);
+    set_flag(ZFLAG, Z==0);
+    set_flag(HFLAG, (Z&15)==15);
+}
+
+
+static void machine_load_hl_Z_inc(void) {
+    /* load into byte pointed to by hl from Z, incremented */
+    Z++;
+    write_byte(get_r16(R16HL), Z);
+    set_flag(NFLAG, 0);
+    set_flag(ZFLAG, Z==0);
+    set_flag(HFLAG, (Z&15) == 0);
 }
 
 
@@ -206,13 +267,13 @@ static void machine_load_r16_WZ(void) {
 static void machine_load_addr_r16_high(void) {
     /* load into byte pointed to by addr from r16's high byte */
     write_byte(addr, get_r16(r16)>>8);
-    reg.PC++;
 }
 
 
-static void machine_load_addr_r16_low(void) {
-    /* load into byte pointed to by addr from r16's low byte */
+static void machine_load_addr_r16_low_inc(void) {
+    /* load into byte pointed to by addr from r16's low byte and inc addr */
     write_byte(addr, get_r16(r16)&0x00FF);
+    addr++;
 }
 
 
@@ -278,12 +339,6 @@ static void machine_pop_W_inc_sp(void) {
 }
 
 
-static void machine_inc_addr(void) {
-    /* increment addr without setting flags */
-    addr++;
-}
-
-
 static void machine_inc_r8(void) {
     /* increment r8 */
     set_r8(r8, get_r8(r8)+1);
@@ -297,15 +352,6 @@ static void machine_inc_r8(void) {
 static void machine_inc_r16(void) {
     /* increment r18 */
     set_r16(r16, get_r16(r16)+1);
-}
-
-
-static void machine_inc_Z(void) {
-    /* increment Z */
-    Z++;
-    set_flag(NFLAG, 0);
-    set_flag(ZFLAG, Z==0);
-    set_flag(HFLAG, (Z&15) == 0);
 }
 
 
@@ -335,15 +381,6 @@ static void machine_dec_r8(void) {
 static void machine_dec_r16(void) {
     /* decrement r18 */
     set_r16(r16, get_r16(r16)-1);
-}
-
-
-static void machine_dec_Z(void) {
-    /* decrement Z */
-    Z--;
-    set_flag(NFLAG, 1);
-    set_flag(ZFLAG, Z==0);
-    set_flag(HFLAG, (Z&15)==15);
 }
 
 
@@ -545,11 +582,11 @@ static void machine_rlc_r8(void) {
 }
 
 
-static void machine_rlc_addr_Z(void) {
-    /* rotate left circular Z, store in addr */
+static void machine_rlc_r16_Z(void) {
+    /* rotate left circular Z, store in byte pointed to by r16 */
     set_flag(CFLAG, Z>>7);
     W = (Z << 1) + get_flag(CFLAG);
-    write_byte(addr, W);
+    write_byte(get_r16(r16), W);
     set_flag(ZFLAG, W==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -568,11 +605,11 @@ static void machine_rrc_r8(void) {
 }
 
 
-static void machine_rrc_addr_Z(void) {
-    /* rotate right circular Z, store in addr */
+static void machine_rrc_r16_Z(void) {
+    /* rotate right circular Z, store in byte pointed to by r16 */
     set_flag(CFLAG, Z&1);
     W = (Z >> 1) + (get_flag(CFLAG)<<7);
-    write_byte(addr, W);
+    write_byte(get_r16(r16), W);
     set_flag(ZFLAG, W==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -592,12 +629,12 @@ static void machine_rl_r8(void) {
 }
 
 
-static void machine_rl_addr_Z(void) {
-    /* rotate left Z, store in addr */
+static void machine_rl_r16_Z(void) {
+    /* rotate left Z, store in byte pointed to by r16 */
     working_bit = get_flag(CFLAG);
     set_flag(CFLAG, Z>>7);
     W = (Z << 1) + working_bit;
-    write_byte(addr, W);
+    write_byte(get_r16(r16), W);
     set_flag(ZFLAG, W==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -617,12 +654,12 @@ static void machine_rr_r8(void) {
 }
 
 
-static void machine_rr_addr_Z(void) {
-    /* rotate right Z, store in addr */
+static void machine_rr_r16_Z(void) {
+    /* rotate right Z, store in byte pointed to by r16 */
     working_bit = get_flag(CFLAG);
     set_flag(CFLAG, Z&1);
     W = (Z >> 1) + (working_bit<<7);
-    write_byte(addr, W);
+    write_byte(get_r16(r16), W);
     set_flag(ZFLAG, W==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -640,11 +677,11 @@ static void machine_sla_r8(void) {
 }
 
 
-static void machine_sla_addr_Z(void) {
-    /* shift left arithmetic Z, store in addr */
+static void machine_sla_r16_Z(void) {
+    /* shift left arithmetic Z, store in byte pointed to by r16 */
     set_flag(CFLAG, Z >> 7);
     Z = Z<<1;
-    write_byte(addr, Z);
+    write_byte(get_r16(r16), Z);
     set_flag(ZFLAG, Z==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -662,11 +699,11 @@ static void machine_sra_r8(void) {
 }
 
 
-static void machine_sra_addr_Z(void) {
-    /* shift right arithmetic Z, store in addr */
+static void machine_sra_r16_Z(void) {
+    /* shift right arithmetic Z, store in byte pointed to by r16 */
     set_flag(CFLAG, Z&1);
     Z = (Z>>1) + (Z&128);
-    write_byte(addr, Z);
+    write_byte(get_r16(r16), Z);
     set_flag(ZFLAG, Z==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -685,11 +722,11 @@ static void machine_swap_r8(void) {
 }
 
 
-static void machine_swap_addr_Z(void) {
-    /* swap nybbles in Z, store in addr */
+static void machine_swap_r16_Z(void) {
+    /* swap nybbles in Z, store in byte pointed to by r16 */
     W = Z << 4;
     Z = W + (Z >> 4);
-    write_byte(addr, Z);
+    write_byte(get_r16(r16), Z);
     set_flag(ZFLAG, Z==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -708,11 +745,11 @@ static void machine_srl_r8(void) {
 }
 
 
-static void machine_srl_addr_Z(void) {
-    /* shift right logically Z, store in addr */
+static void machine_srl_r16_Z(void) {
+    /* shift right logically Z, store in byte pointed to by r16 */
     set_flag(CFLAG, Z&1);
     Z = Z>>1;
-    write_byte(addr, Z);
+    write_byte(get_r16(r16), Z);
     set_flag(ZFLAG, Z==0);
     set_flag(HFLAG, 0);
     set_flag(NFLAG, 0);
@@ -744,9 +781,9 @@ static void machine_res_W_r8(void) {
 }
 
 
-static void machine_res_addr_W_Z(void) {
-    /* reset bit W in r8 and store in addr */
-    write_byte(addr, Z & ~(1<<W));
+static void machine_res_r16_W_Z(void) {
+    /* reset bit W in r8 and store in byte pointed to by r16 */
+    write_byte(get_r16(r16), Z & ~(1<<W));
 }
 
 
@@ -757,9 +794,9 @@ static void machine_set_W_r8(void) {
 }
 
 
-static void machine_set_addr_W_Z(void) {
-    /* set bit W in r8 and store in addr */
-    write_byte(addr, Z | (1<<W));
+static void machine_set_r16_W_Z(void) {
+    /* set bit W in r8 and store in the byte pointed to by r16 */
+    write_byte(get_r16(r16), Z | (1<<W));
 }
 
 
@@ -874,8 +911,8 @@ static void instr_ld_r8_imm8(void) {
 static void instr_ld_r8_hl(void) {
     /* load into register r8 from byte pointed to by hl */
     r8 = (read_byte(reg.PC)>>3)&7;
-    addr = reg.HL;
-    scheduled_instructions[0] = &machine_load_Z_addr;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_Z_r16;
     scheduled_instructions[1] = &machine_load_r8_Z;
     num_scheduled_instructions = 2;
 }
@@ -893,19 +930,19 @@ static void instr_ld_hl_r8(void) {
 
 static void instr_ld_hl_imm8(void) {
     /* load into byte pointed to by hl */
-    addr = reg.HL;
+    r16 = R16HL;
     scheduled_instructions[0] = &machine_load_Z_imm8;
-    scheduled_instructions[1] = &machine_load_addr_Z;
-    scheduled_instructions[2] = &machine_idle;
+    scheduled_instructions[1] = &machine_load_r16_Z;
+    scheduled_instructions[2] = &machine_nop;
     num_scheduled_instructions = 3;
 }
 
 
 static void instr_ld_A_r16(void) {
     /* load into A from byte pointed to by r16 */
-    addr = get_r16((read_byte(reg.PC)>>4)&3);
+    r16 = (read_byte(reg.PC)>>4)&3;
     r8 = R8A;
-    scheduled_instructions[0] = &machine_load_Z_addr;
+    scheduled_instructions[0] = &machine_load_Z_r16;
     scheduled_instructions[1] = &machine_load_r8_Z;
     num_scheduled_instructions = 2;
 }
@@ -988,9 +1025,8 @@ static void instr_ldh_imm8_a(void) {
 static void instr_ld_a_hl_minus(void) {
     /* load into A from the byte pointed to by HL, and decrement HL */
     r8 = R8A;
-    addr = reg.HL;
-    reg.HL--;
-    scheduled_instructions[0] = &machine_load_Z_addr;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_dec_Z_r16;
     scheduled_instructions[1] = &machine_load_r8_Z;
     num_scheduled_instructions = 2;
 }
@@ -999,9 +1035,8 @@ static void instr_ld_a_hl_minus(void) {
 static void instr_ld_hl_a_minus(void) {
     /* load into the byte pointed to by HL from A, and decrement HL */
     r8 = R8A;
-    addr = reg.HL;
-    reg.HL--;
-    scheduled_instructions[0] = &machine_load_addr_r8;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_dec_r16_r8;
     scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
@@ -1010,9 +1045,8 @@ static void instr_ld_hl_a_minus(void) {
 static void instr_ld_a_hl_plus(void) {
     /* load into A from the byte pointed to by HL, and increment HL */
     r8 = R8A;
-    addr = reg.HL;
-    reg.HL++;
-    scheduled_instructions[0] = &machine_load_Z_addr;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_inc_Z_r16;
     scheduled_instructions[1] = &machine_load_r8_Z;
     num_scheduled_instructions = 2;
 }
@@ -1021,9 +1055,8 @@ static void instr_ld_a_hl_plus(void) {
 static void instr_ld_hl_a_plus(void) {
     /* load into the byte pointed to by HL from A, and increment HL */
     r8 = R8A;
-    addr = reg.HL;
-    reg.HL++;
-    scheduled_instructions[0] = &machine_load_addr_r8;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_inc_r16_r8;
     scheduled_instructions[1] = &machine_nop;
     num_scheduled_instructions = 2;
 }
@@ -1044,9 +1077,9 @@ static void instr_ld_imm16_sp(void) {
     r16 = R16SP;
     scheduled_instructions[0] = &machine_load_addr_low_imm8;
     scheduled_instructions[1] = &machine_load_addr_high_imm8;
-    scheduled_instructions[2] = &machine_load_addr_r16_low;
-    scheduled_instructions[3] = &machine_inc_addr;
-    scheduled_instructions[4] = &machine_load_addr_r16_high;
+    scheduled_instructions[2] = &machine_load_addr_r16_low_inc;
+    scheduled_instructions[3] = &machine_load_addr_r16_high;
+    scheduled_instructions[4] = &machine_nop;
     num_scheduled_instructions = 5;
 }
 
@@ -1236,10 +1269,10 @@ static void instr_inc_r8(void) {
 
 static void instr_inc_hl(void) {
     /* increment byte pointed to by hl */
-    addr = reg.HL;
-    scheduled_instructions[0] = &machine_load_Z_addr;
-    scheduled_instructions[1] = &machine_inc_Z;
-    scheduled_instructions[2] = &machine_load_addr_Z;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_Z_r16;
+    scheduled_instructions[1] = &machine_load_hl_Z_inc;
+    scheduled_instructions[2] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 3;
 }
 
@@ -1254,10 +1287,10 @@ static void instr_dec_r8(void) {
 
 static void instr_dec_hl(void) {
     /* decrement byte pointed to by hl */
-    addr = reg.HL;
-    scheduled_instructions[0] = &machine_load_Z_addr;
-    scheduled_instructions[1] = &machine_dec_Z;
-    scheduled_instructions[2] = &machine_load_addr_Z;
+    r16 = R16HL;
+    scheduled_instructions[0] = &machine_load_Z_r16;
+    scheduled_instructions[1] = &machine_load_hl_Z_dec;
+    scheduled_instructions[2] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 3;
 }
 
@@ -1451,8 +1484,8 @@ static void instr_rlc_r8(void) {
 static void instr_rlc_hl(void) {
     /* rotate left circular the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_rlc_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_rlc_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1470,8 +1503,8 @@ static void instr_rrc_r8(void) {
 static void instr_rrc_hl(void) {
     /* rotate right circular the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_rrc_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_rrc_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1489,8 +1522,8 @@ static void instr_rl_r8(void) {
 static void instr_rl_hl(void) {
     /* rotate left the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_rl_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_rl_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1508,8 +1541,8 @@ static void instr_rr_r8(void) {
 static void instr_rr_hl(void) {
     /* rotate right the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_rr_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_rr_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1526,8 +1559,8 @@ static void instr_sla_r8(void) {
 static void instr_sla_hl(void) {
     /* shift left arithmetic the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_sla_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_sla_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1544,8 +1577,8 @@ static void instr_sra_r8(void) {
 static void instr_sra_hl(void) {
     /* shift right arithmetic the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_sra_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_sra_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1562,8 +1595,8 @@ static void instr_swap_r8(void) {
 static void instr_swap_hl(void) {
     /* swap nybbles in the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_swap_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_swap_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1580,8 +1613,8 @@ static void instr_srl_r8(void) {
 static void instr_srl_hl(void) {
     /* shift right logically the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_srl_addr_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_srl_r16_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1598,7 +1631,7 @@ static void instr_bit_r8(void) {
 static void instr_bit_hl(void) {
     /* test bit b in the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
+    scheduled_instructions[1] = &machine_load_Z_r16;
     scheduled_instructions[2] = &machine_bit_W_Z;
     num_scheduled_instructions = 3;
 }
@@ -1615,8 +1648,8 @@ static void instr_res_r8(void) {
 static void instr_res_hl(void) {
     /* reset bit b in the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_res_addr_W_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_res_r16_W_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
@@ -1633,8 +1666,8 @@ static void instr_set_r8(void) {
 static void instr_set_hl(void) {
     /* set bit b in the byte pointed to by hl */
     scheduled_instructions[0] = &machine_consume_prefix;
-    scheduled_instructions[1] = &machine_load_Z_addr;
-    scheduled_instructions[2] = &machine_set_addr_W_Z;
+    scheduled_instructions[1] = &machine_load_Z_r16;
+    scheduled_instructions[2] = &machine_set_r16_W_Z;
     scheduled_instructions[3] = &machine_nop; // free address bus to load next opcode
     num_scheduled_instructions = 4;
 }
