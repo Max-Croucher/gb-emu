@@ -22,11 +22,13 @@ Notes:
 #include <string.h>
 #include <stdbool.h>
 #include <GL/freeglut.h>
+#include "miniaudio.h"
 #include "cpu.h"
 #include "rom.h"
 #include "opcodes.h"
 #include "graphics.h"
 #include "mnemonics.h"
+#include "audio.h"
 
 #include <unistd.h>
 
@@ -101,6 +103,7 @@ int main(int argc, char *argv[]) {
     decode_launch_args(argc, argv);
     init_ram();
     init_registers();
+    if (!init_audio()) print_error("Failed to initialise audio.\n");
     if (!no_display) init_graphics(&argc, argv, rom.title);
     if (verbose_logging) {
         logfile = fopen("cpu_states.log", "w");
