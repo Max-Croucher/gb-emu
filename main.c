@@ -42,6 +42,7 @@ bool print_breakpoints = 0; //extern
 bool dmg_colours = 0; //extern
 bool debug_tilemap = 0; //extern
 bool debug_scanlines = 0; //extern
+bool frame_by_frame = 0; //extern
 bool hyperspeed = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
@@ -73,6 +74,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--tilemap")) debug_tilemap = 1;
         if (!strcmp(argv[i], "--scanline")) {debug_tilemap = 1; debug_scanlines = 1;}
         if (!strcmp(argv[i], "--green")) dmg_colours = 1;
+        if (!strcmp(argv[i], "--frame-by-frame")) frame_by_frame = 1;
     }
 }
 
@@ -115,8 +117,8 @@ int main(int argc, char *argv[]) {
                 if (OAM_DMA_starter) {
                     OAM_DMA_starter--;
                     if (!OAM_DMA_starter) {
-                        fprintf(stderr, "DMA: starting at sysclk=0x%.4x\n", system_counter);
-                        printf("DMA: starting at sysclk=0x%.4x\n", system_counter);
+                        // fprintf(stderr, "DMA: starting at sysclk=0x%.4x\n", system_counter);
+                        // printf("DMA: starting at sysclk=0x%.4x\n", system_counter);
                         OAM_DMA = 1;
                         OAM_DMA_timeout = 0;
                     }

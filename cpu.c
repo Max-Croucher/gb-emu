@@ -276,7 +276,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
 
     if (addr == 0xFF46) { // enter DMA mode
         *(ram+addr) = byte;
-        printf("DMA: Scheduled start at sysclk=%.4x\n", system_counter);
+        //printf("DMA: Scheduled start at sysclk=%.4x\n", system_counter);
         OAM_DMA_starter = 2;
         return;
     }

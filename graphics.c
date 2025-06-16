@@ -22,6 +22,7 @@ extern bool hyperspeed;
 extern bool debug_tilemap;
 extern bool debug_scanlines;
 extern bool dmg_colours;
+extern bool frame_by_frame;
 
 clock_t start,end;
 double rolling_frametime = 0;
@@ -654,28 +655,30 @@ void draw_objects(void) {
             } else {
                 load_tile(tiles[i], get_tile_addr(objects[i].tileid, 1));
             }
-            for (uint16_t screen_x = objects[i].xpos-8; screen_x<objects[i].xpos; screen_x++) {
-                ObjectAttribute target_object = objects[i];
-                uint8_t sprite_x = screen_x - (target_object.xpos-8);
-                if (!target_object.xflip) sprite_x = 7 - sprite_x;
-                uint8_t sprite_y = *(ram+0xFF44) - (target_object.ypos-16);
-                if (target_object.yflip && !((*(ram+0xFF40))&4)) sprite_y = 7 - sprite_y;
-                if (target_object.yflip && ((*(ram+0xFF40))&4)) sprite_y = 15 - sprite_y;
-                uint16_t tile_line;
-                if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
-                    tile_line = tiles[i][sprite_y];
-                } else { // object 8x16 mode
-                    if (sprite_y < 8) {
-                        tile_line = tiles[2*i][sprite_y];
-                    } else {
-                        tile_line = tiles[2*i + 1][sprite_y-8];
+            for (int16_t screen_x = objects[i].xpos-8; screen_x<objects[i].xpos; screen_x++) {
+                if (screen_x >= 0 && screen_x < 160) {
+                    ObjectAttribute target_object = objects[i];
+                    uint8_t sprite_x = screen_x - (target_object.xpos-8);
+                    if (!target_object.xflip) sprite_x = 7 - sprite_x;
+                    uint8_t sprite_y = *(ram+0xFF44) - (target_object.ypos-16);
+                    if (target_object.yflip && !((*(ram+0xFF40))&4)) sprite_y = 7 - sprite_y;
+                    if (target_object.yflip && ((*(ram+0xFF40))&4)) sprite_y = 15 - sprite_y;
+                    uint16_t tile_line;
+                    if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
+                        tile_line = tiles[i][sprite_y];
+                    } else { // object 8x16 mode
+                        if (sprite_y < 8) {
+                            tile_line = tiles[2*i][sprite_y];
+                        } else {
+                            tile_line = tiles[2*i + 1][sprite_y-8];
+                        }
                     }
-                }
-                uint8_t pixel = (tile_line>>(2*sprite_x))&3;
-                if (pixel && !(target_object.priority & bgw_priority_map[143-*(ram+0xFF44)][screen_x])) { // skip if transparent and background does not have priority
-                    texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][0];
-                    texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][1];
-                    texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][2];
+                    uint8_t pixel = (tile_line>>(2*sprite_x))&3;
+                    if (pixel && !(target_object.priority & bgw_priority_map[143-*(ram+0xFF44)][screen_x])) { // skip if transparent and background does not have priority
+                        texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][0];
+                        texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][1];
+                        texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][2];
+                    }
                 }
             }
         }
@@ -733,7 +736,15 @@ bool tick_graphics(void) {
                 glutSetWindow(WindowMain);
                 debug_frames_done++;
             }
-            framerate();
+            if (frame_by_frame) {
+                if (debug_frames_done >= debug_frameskip) {
+                    getchar();
+                    char x[1];
+                    scanf("");
+                }
+            } else {
+                framerate();
+            }
         } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
             *(ram+0xFF41) &= 0xFC;
             *(ram+0xFF41) += 2; // set ppu mode to 2
