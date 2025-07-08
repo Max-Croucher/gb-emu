@@ -46,6 +46,7 @@ bool debug_tilemap = 0; //extern
 bool debug_scanlines = 0; //extern
 bool frame_by_frame = 0; //extern
 bool hyperspeed = 0;
+bool no_audio = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
 
@@ -77,6 +78,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--scanline")) {debug_tilemap = 1; debug_scanlines = 1;}
         if (!strcmp(argv[i], "--green")) dmg_colours = 1;
         if (!strcmp(argv[i], "--frame-by-frame")) frame_by_frame = 1;
+        if (!strcmp(argv[i], "--no-audio")) no_audio = 1;
     }
 }
 
@@ -103,7 +105,7 @@ int main(int argc, char *argv[]) {
     decode_launch_args(argc, argv);
     init_ram();
     init_registers();
-    init_audio();
+    if (!no_audio) init_audio();
     if (!no_display) init_graphics(&argc, argv, rom.title);
     if (verbose_logging) {
         logfile = fopen("cpu_states.log", "w");
@@ -195,11 +197,12 @@ int main(int argc, char *argv[]) {
                 TIMA_overflow_flag = 0;
             }
             if (!no_display) tick_graphics();
+            if (!no_audio) tick_audio();
             //usleep(10);
         }
     }
 
-    close_audio();
+    if (!no_audio) close_audio();
 
     //write ram contents to a file
     if (verbose_logging) {
