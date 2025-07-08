@@ -10,7 +10,9 @@
 #define MA_NO_DECODING
 #define MA_NO_ENCODING
 
-bool init_audio(void);
+void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
+void init_audio(void);
+void close_audio(void);
 void event_length(void);
 void event_ch1_freq_sweep(void);
 void event_envelope_sweep(void);

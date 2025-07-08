@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     decode_launch_args(argc, argv);
     init_ram();
     init_registers();
-    if (!init_audio()) print_error("Failed to initialise audio.\n");
+    init_audio();
     if (!no_display) init_graphics(&argc, argv, rom.title);
     if (verbose_logging) {
         logfile = fopen("cpu_states.log", "w");
@@ -198,6 +198,8 @@ int main(int argc, char *argv[]) {
             //usleep(10);
         }
     }
+
+    close_audio();
 
     //write ram contents to a file
     if (verbose_logging) {
