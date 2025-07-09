@@ -29,11 +29,13 @@ static uint8_t div_apu = 1;
 static bool last_div_bit = 0;
 static uint16_t gb_sample_index = 0;
 static double capacitors[DEVICE_CHANNELS] = {0.0};
+static uint16_t audio_sample_divider = CLK_HZ / DEVICE_SAMPLE_RATE;
 
 typedef struct channel_attributes {
     uint8_t sample_state;
     uint8_t length_timer;
-    uint8_t envelope_timer;
+    uint8_t sweep_timer;
+    uint8_t sweep_attrs;
     uint8_t amplitude;
     uint8_t duty_period;
     uint16_t pulse_period;
@@ -51,6 +53,7 @@ static uint32_t buf_readpos = 0;
 static uint32_t buf_writepos = 0;
 static float audio_buffer[AUDIO_BUF_NUM_SAMPLES];
 
+//FILE* raw_audio_file;
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
     /* callback routine for miniaudio. This function is automatically called when
@@ -61,26 +64,32 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     all four voices and applies the global amplitude and enable flags. */
 
     float* pFramesOutF32 = (float*)pOutput;
-    // for (ma_uint64 frame = 0; frame < frameCount; frame += 1) {
-    //     for (ma_uint64 i = 0; i < ((ma_waveform*)pDevice->pUserData)->config.channels; i += 1) {
-    //         pFramesOutF32[frame*((ma_waveform*)pDevice->pUserData)->config.channels + i] = flip_flop_state;
-    //     }
-    //     flip_flop_timer--;
-    //     if (!flip_flop_timer) {
-    //         flip_flop_state *= -1;
-    //         flip_flop_timer = 100;
-    //     }
-    // }
 
-    ma_uint64 buffered_frames = ((buf_writepos - buf_readpos) / DEVICE_CHANNELS) % AUDIO_BUF_NUM_FRAMES;
+    ma_uint64 buffered_frames = ((AUDIO_BUF_NUM_SAMPLES + buf_writepos - buf_readpos) % AUDIO_BUF_NUM_SAMPLES) / 2;
+    //printf("Reqesting %d frames. Divider is %d. Reader is at %d, Writer is at %d. %lld are available.", frameCount, audio_sample_divider, buf_readpos, buf_writepos, buffered_frames);
     if (frameCount > buffered_frames) frameCount = buffered_frames;
+    //printf(" Copying %d frames from position %d", frameCount, buf_readpos);
+
+    if (buffered_frames) {
+        if (buffered_frames > 1200) {
+            audio_sample_divider=88;
+        } else {
+            audio_sample_divider=87;
+        }
+    }
 
     if (buf_readpos + frameCount * DEVICE_CHANNELS < AUDIO_BUF_NUM_SAMPLES) { // buf does not wrap around. do one memcpy
+        //printf(" (contiguous)\n");
+        //fwrite(&audio_buffer[buf_readpos], sizeof(float), frameCount * DEVICE_CHANNELS, raw_audio_file);
         memcpy(pFramesOutF32, &audio_buffer[buf_readpos], sizeof(float) * frameCount * DEVICE_CHANNELS);
         buf_readpos += frameCount * DEVICE_CHANNELS;
     } else { // buf wraps around. Do two memcpys
+        //printf(" (wrapped): %ld bytes at end", sizeof(float) * (AUDIO_BUF_NUM_SAMPLES-buf_readpos));
+        //fwrite(&audio_buffer[buf_readpos], sizeof(float), AUDIO_BUF_NUM_SAMPLES-buf_readpos, raw_audio_file);
         memcpy(pFramesOutF32, &audio_buffer[buf_readpos], sizeof(float) * (AUDIO_BUF_NUM_SAMPLES-buf_readpos));
         uint32_t new_readpos = (frameCount * DEVICE_CHANNELS - (AUDIO_BUF_NUM_SAMPLES-buf_readpos));
+        //printf(" and %ld bytes at start\n", sizeof(float) * new_readpos);
+        //fwrite(audio_buffer, sizeof(float), new_readpos, raw_audio_file);
         memcpy(&pFramesOutF32[AUDIO_BUF_NUM_SAMPLES-buf_readpos], audio_buffer, sizeof(float) * new_readpos);
         buf_readpos = new_readpos;
     }
@@ -91,6 +100,8 @@ void init_audio(void) {
     /* initialise the audio controller */
     ma_device_config device_config;
     ma_waveform_config ch2_waveform_config;
+
+    //raw_audio_file = fopen("raw_audio.waveform", "wb");
 
     device_config = ma_device_config_init(ma_device_type_playback);
     device_config.playback.format   = DEVICE_FORMAT;
@@ -127,7 +138,7 @@ void close_audio(void) {
 
 static inline void event_length(void) {
     /* process the ticking of the length timer */
-    if ((read_byte(0xFF26)&2) && (read_byte(0xFF19)&0x80)) { // is channel 2 on and length enabled?
+    if ((read_byte(0xFF26)&2) && (read_byte(0xFF19)&0x40)) { // is channel 2 on and length enabled?
         channels[1].length_timer++;
         if (channels[1].length_timer >= 64) {
             *(ram+0xFF26) &= ~2; // disable channel 2
@@ -143,6 +154,17 @@ static inline void event_ch1_freq_sweep(void) {
 
 static inline void event_envelope_sweep(void) {
     /* process the ticking of the amplitude envelope */
+    if ((read_byte(0xFF26)&2) && (read_byte(0xFF17)&7)) { // is channel 2 on and sweep not 0 ?
+        channels[1].sweep_timer++;
+        if (channels[1].sweep_timer >= channels[1].sweep_attrs&7) { // sweep pace
+            channels[1].sweep_timer = 0;
+            if (channels[1].sweep_attrs&8) { // env dir
+                if (channels[1].amplitude != 15) channels[1].amplitude++;
+            } else {
+                if (channels[1].amplitude != 0) channels[1].amplitude--;
+            }
+        }
+    }
 }
 
 
@@ -156,8 +178,7 @@ float high_pass(float value, uint8_t cap_id) {
 
 static inline void write_to_buf(float val) {
     /* write val to the audio buffer and increment write head */
-    audio_buffer[buf_writepos++];
-    printf("%.4f\n", val);
+    audio_buffer[buf_writepos++] = val;
     if (buf_writepos >= AUDIO_BUF_NUM_SAMPLES) buf_writepos = 0;
 }
 
@@ -172,30 +193,38 @@ static inline void queue_sample(void) {
     Add to buffer
     */
     float samples[DEVICE_CHANNELS] = {0,0};
-    // for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) { // FIX ME FOR DEAD CHANNELS - only add channels if DAC is on
-    //     float curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
-    //     if (read_byte(0xFF25) & 1 << i    ) samples[0] += curr_sample; // right
-    //     if (read_byte(0xFF25) & 1 << (i+4)) samples[1] += curr_sample; // left
-    // }
+    bool dac_state[4] = {
+        read_byte(0xFF12) & 0xF8,
+        read_byte(0xFF17) & 0xF8,
+        read_byte(0xFF1A) & 128,
+        read_byte(0xFF21) & 0xF8
+    };
+    for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) { // FIX ME FOR DEAD CHANNELS - only add channels if DAC is on
+        if (dac_state[i]) {
+            float curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
+            if (read_byte(0xFF25) & 1 << i    ) samples[0] += curr_sample; // right
+            if (read_byte(0xFF25) & 1 << (i+4)) samples[1] += curr_sample; // left
+            }
+    }
     
-    // temp for ch2 only
-    float curr_sample = ((float)channels[1].sample_state / 7.5) - 1.0; // scale to [-1, 1]
-    if (read_byte(0xFF25) & 2 ) samples[0] += curr_sample; // right
-    if (read_byte(0xFF25) & 32) samples[1] += curr_sample; // left
+    // // temp for ch2 only
+    // float curr_sample = ((float)channels[1].sample_state / 7.5) - 1.0; // scale to [-1, 1]
+    // if (read_byte(0xFF25) & 2 ) samples[0] += curr_sample; // right
+    // if (read_byte(0xFF25) & 32) samples[1] += curr_sample; // left
 
     // at this point, each device channel's sample is in the range [-1,1]
 
     for (uint8_t i=0; i<DEVICE_CHANNELS; i++) {
-        printf(" %.4f ", samples[i]);
+        //printf(" %.4f ", samples[i]);
         if (read_byte(0xFF24) & (1 << (3 + (4*i)))){ // is master channel on
             samples[i] = 0;
-            printf(" (%c off) ", i ? 'r' : 'l');
+            //printf(" (%c off) ", i ? 'r' : 'l');
 
         } else {
             samples[i] *= (float)(((read_byte(0xFF24) >> (4*i)) & 7) + 1) / 8.0; // scale by master volume
-            printf(" %.4f ", samples[i]);
+            //printf(" %.4f ", samples[i]);
             samples[i] = high_pass(samples[i], i);
-            printf(" (%c on)  ", i ? 'r' : 'l');
+            //printf(" (%c on)  ", i ? 'r' : 'l');
         }
         write_to_buf(samples[i]);
 
@@ -212,9 +241,11 @@ void handle_audio_register(uint16_t addr) {
         if (read_byte(0xFF17) & 0xF8) { // only enable channel if DAC is on
             *(ram+0xFF26) |= 2; // enable channel 2
             if (channels[1].length_timer >= 64) channels[1].length_timer = read_byte(0xFF16)&0x63; // reset length timer if expired
-            channels[1].pulse_period = *(ram+0xFF18) + ((uint16_t)(*(ram+0xFF19)&7)<<8); // set pulse period
+            channels[1].pulse_period = *(ram+0xFF18) + (((uint16_t)(*(ram+0xFF19)&7))<<8); // set pulse period
             channels[1].amplitude = read_byte(0xFF17) >> 4; // set sweep amplitude
             channels[1].duty_period = 0; // reset phase of pulse
+            channels[1].sweep_timer = 0; // reset amplitude envelope timer
+            channels[1].sweep_attrs = read_byte(0xFF17) & 15; // store amplitude sweep pace and direction
         }
         break;
     
@@ -234,17 +265,17 @@ static inline void tick_channel_2(void) {
     if (read_byte(0xFF26) & 2) { // is channel 2 on?
         channels[1].pulse_period++;
         if (channels[1].pulse_period >= 0x7FF) { // overflow at 2047
-            channels[1].pulse_period = *(ram+0xFF18) + ((uint16_t)(*(ram+0xFF19)&7)<<8); // reset to the channel 2 period
+            channels[1].pulse_period = *(ram+0xFF18) + (((uint16_t)(*(ram+0xFF19)&7))<<8); // reset to the channel 2 period
 
             uint8_t duty_limit = (read_byte(0xFF16)>>6) * 2;
             if (!duty_limit) duty_limit++;
 
             if ((channels[1].duty_period%8) < duty_limit) { // sample is low
                 channels[1].sample_state = 0;
-                fprintf(stdout, "<");
+                //fprintf(stdout, "<");
             } else { // sample is high
                 channels[1].sample_state = channels[1].amplitude;
-                fprintf(stdout, ">");
+                //fprintf(stdout, ">");
             }
             channels[1].duty_period++;
         }
@@ -266,15 +297,11 @@ inline void tick_audio(void) {
     /* tick every t-cycle and handle timing of all audio events */
     bool div_bit = (system_counter>>12)&1; // bit 4 of div
     if (last_div_bit && !div_bit) {
+
+        if (div_apu % 2 == 0) event_length();           // 256 Hz
+        if (div_apu % 4 == 3) event_ch1_freq_sweep();   // 128 Hz
+        if (div_apu % 8 == 7) event_envelope_sweep();   // 64 Hz
         div_apu++;
-
-        if (div_apu % 2 == 0) event_length();
-        if (div_apu % 4 == 0) event_ch1_freq_sweep();
-        if (div_apu == 8) {
-            event_envelope_sweep();
-            div_apu = 0;
-        }
-
     }
     if (system_counter % 4 == 0) {
         tick_channel_1();
@@ -283,8 +310,15 @@ inline void tick_audio(void) {
     // tick_channel_3();
     // tick_channel_4();
 
-    // send 375 samples to audio buf every 32,768 gameboy ticks
-    if (gb_sample_index % 175 == 0 || gb_sample_index % 175 == 87) queue_sample();
+
+    // must send 48000 samples every 4194304 ticks (one second)
+    // therefore, send 375 samples every 32,768 gameboy ticks
+
+    // if ((gb_sample_index%0x8000) % 175 == 0 || (gb_sample_index%0x8000) % 175 == 87) queue_sample();
+    // gb_sample_index++;
+
+    if (gb_sample_index % audio_sample_divider == 0) queue_sample();
     gb_sample_index++;
+
     last_div_bit = div_bit;
 }
