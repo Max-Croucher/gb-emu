@@ -86,10 +86,10 @@ void decode_launch_args(int argc, char *argv[]) {
 bool service_interrupts(void) {
     /* Check if an interrupt is due, moving execution if necessary */
     if (reg.IME) { // IME must be set
-        uint8_t available_regs = *(ram+0xFF0F)&*(ram+0xFFFF)&0x1F;
+        uint8_t available_regs = *(ram+REG_IF)&*(ram+REG_IE)&0x1F;
         for (int isr=0; isr<5; isr++) { //Check for each of the 5 interrupts
             if (available_regs & 1<<isr) {
-                *(ram+0xFF0F) &= ~(uint8_t)(1<<isr); //disable IF
+                *(ram+REG_IF) &= ~(uint8_t)(1<<isr); //disable IF
                 set_ime(0);
                 load_interrupt_instructions(isr);
                 return 1;
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
         //fprintf(stderr, "%d | (%d, %d) | %d | %d\n", system_counter, current_instruction_count, num_scheduled_instructions, halt_state, stop_mode);
         increment_timers();
         if (stop_mode) {
-            if ((*(ram+0xFF00)&0xF) != 0xF) stop_mode = 0; 
+            if ((*(ram+REG_JOYP)&0xF) != 0xF) stop_mode = 0; 
         } else {
 
             if (!(system_counter&3)) {
@@ -132,9 +132,9 @@ int main(int argc, char *argv[]) {
 
                 if (TIMA_overflow_delay) { // do TIMA overflow late
                     TIMA_overflow_delay--;
-                    if ((!*(ram+0xFF05)) && (!TIMA_overflow_delay)) {
-                        *(ram+0xFF05) = *(ram+0xFF06); // reset to TMA
-                        *(ram+0xFF0F) |= 1<<2; // request a timer interrupt
+                    if ((!*(ram+REG_TIMA)) && (!TIMA_overflow_delay)) {
+                        *(ram+REG_TIMA) = *(ram+REG_TMA); // reset to TMA
+                        *(ram+REG_IF) |= 1<<2; // request a timer interrupt
                         TIMA_overflow_flag = 1;
                     }
                 }
@@ -152,11 +152,11 @@ int main(int argc, char *argv[]) {
                         get_r8(R8D),get_r8(R8E),get_r8(R8H),get_r8(R8L),
                         get_r16(R16SP),get_r16(R16PC),
                         *(ram+get_r16(R16PC)),*(ram+get_r16(R16PC)+1),*(ram+get_r16(R16PC)+2),*(ram+get_r16(R16PC)+3),
-                        reg.IME, halt_state, stop_mode, *(ram+0xFFFF), *(ram+0xFF0F),
+                        reg.IME, halt_state, stop_mode, *(ram+REG_IE), *(ram+REG_IF),
                         ((*(ram+get_r16(R16PC))==0xCB) ? mn_cb_opcodes[*(ram+get_r16(R16PC)+1)] : mn_opcodes[*(ram+get_r16(R16PC))])
                     );
 
-                    if (halt_state && (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F)) { //An interrupt is now pending to quit HALT
+                    if (halt_state && (*(ram+REG_IF)&*(ram+REG_IE)&0x1F)) { //An interrupt is now pending to quit HALT
                         halt_state = 0;
                     }
                     if (!halt_state) service_interrupts();

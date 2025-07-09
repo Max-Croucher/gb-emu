@@ -41,8 +41,8 @@ void increment_timers(void) {
         system_counter++;
     }
     bool timer_current_state = 0;
-    if ((*(ram+0xFF07)>>2)&1) { // is timer enabled in TAC
-        switch ((*(ram+0xFF07))&3) // Select timer speed
+    if ((*(ram+REG_TAC)>>2)&1) { // is timer enabled in TAC
+        switch ((*(ram+REG_TAC))&3) // Select timer speed
         {
         case 0: //4096 Hz
             timer_current_state = (system_counter>>9)&1;
@@ -59,8 +59,8 @@ void increment_timers(void) {
         }
     }
     if (timer_last_state && !timer_current_state) { // falling edge
-        (*(ram+0xFF05))++; // inc TIMA
-        if (!*(ram+0xFF05)) TIMA_overflow_delay = 2; // trigger overflow
+        (*(ram+REG_TIMA))++; // inc TIMA
+        if (!*(ram+REG_TIMA)) TIMA_overflow_delay = 2; // trigger overflow
     }
     timer_last_state = timer_current_state;
 }
@@ -264,8 +264,8 @@ uint8_t decode_r16stk(uint8_t code) {
 
 void set_isr_enable(uint8_t isr_type, bool state) {
     /* Enable or disable a particular type of interrupt */
-    *(ram+0xFFFF) &= ~(1<<isr_type); //clear bit
-    *(ram+0xFFFF) |= (state<<isr_type); //set bit
+    *(ram+REG_IE) &= ~(1<<isr_type); //clear bit
+    *(ram+REG_IE) |= (state<<isr_type); //set bit
 }
 
 
@@ -273,7 +273,7 @@ void write_byte(uint16_t addr, uint8_t byte) {
     /* Write a byte to a particular address. Ignores writing to protected RAM */
     if (OAM_DMA  && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM is inaccessible during DMA
 
-    if (addr == 0xFF46) { // enter DMA mode
+    if (addr == REG_DMA) { // enter DMA mode
         *(ram+addr) = byte;
         //printf("DMA: Scheduled start at sysclk=%.4x\n", system_counter);
         OAM_DMA_starter = 2;
@@ -298,13 +298,13 @@ void write_byte(uint16_t addr, uint8_t byte) {
     if (addr >= 0xFEA0 && addr < 0xFEFF) return;
 
 
-    if (addr == 0xFF00) { //writing to this addr queries the joypad
-        *(ram+0xFF00) = *(ram+0xFF00)&0xCF;
-        *(ram+0xFF00) |= byte&0x30; // set mask of byte
+    if (addr == REG_JOYP) { //writing to this addr queries the joypad
+        *(ram+REG_JOYP) = *(ram+REG_JOYP)&0xCF;
+        *(ram+REG_JOYP) |= byte&0x30; // set mask of byte
         joypad_io();
         return;
     }
-    if (addr == 0xFF04) { //writing to DIV sets it to 0, but requires special timer behaviour
+    if (addr == REG_DIV) { //writing to DIV sets it to 0, but requires special timer behaviour
         div_reset_old_sysclk=system_counter;
         system_counter = 0;
         do_div_reset=1;
@@ -312,33 +312,33 @@ void write_byte(uint16_t addr, uint8_t byte) {
         return;
     }
 
-    if (addr == 0xFF05) { // writing to TIMA
+    if (addr == REG_TIMA) { // writing to TIMA
         if (TIMA_overflow_delay == 2) {
             TIMA_overflow_delay = 0; // don't trigger overflow
             *(ram+addr) = byte;
             return;
         } 
         if (TIMA_overflow_flag) {
-            *(ram+0xFF05) = *(ram+0xFF06);
+            *(ram+REG_TIMA) = *(ram+REG_TMA);
             return;
         }
     }
-    if (addr == 0xFF06) { //writing to TMA
-        if (TIMA_overflow_flag) *(ram+0xFF05) = byte;
+    if (addr == REG_TMA) { //writing to TMA
+        if (TIMA_overflow_flag) *(ram+REG_TIMA) = byte;
         *(ram+addr) = byte;
         return;
     }
 
 
-    if (addr == 0xFF44) return;
-    if (addr == 0xFF41) {
+    if (addr == REG_LY) return;
+    if (addr == REG_STAT) {
         *(ram+addr) &= 0x87;
         *(ram+addr) += byte & 0x78; // only set certain regs
         return;
     }
 
-    // if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
-    // if ((*(ram+0xFF41)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
+    // if ((*(ram+REG_STAT)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return; // OAM inaccessible
+    // if ((*(ram+REG_STAT)&3) && (addr >= 0x8000 && addr < 0xA000)) return; // VRAM inaccessible
 
     if (addr >= 0xFF00 && addr < 0xFF80) { //Special instructions
         uint8_t mask = write_masks[addr&0xFF];
@@ -364,19 +364,17 @@ uint8_t read_byte(uint16_t addr) {
         return read_ext_ram(addr-0xA000);
     }
 
-    if ((*(ram+0xFF41)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
-    if (((*(ram+0xFF41)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
+    if ((*(ram+REG_STAT)&2) && (addr >= 0xFE00 && addr < 0xFEA0)) return 0xFF; // OAM inaccessible
+    if (((*(ram+REG_STAT)&3)==3) && (addr >= 0x8000 && addr < 0xA000)) return 0xFF; // VRAM inaccessible
 
-    if (addr == 0xFF04) { //reading DIV
+    if (addr == REG_DIV) { //reading DIV
         return system_counter>>8;
     }
 
-    if (addr == 0xFF00) { //reading joypad
+    if (addr == REG_JOYP) { //reading joypad
         joypad_io();
         return *(ram+addr);
     }
-
-    if (addr == 0xFF4D) return 0xFF; //KEY0 in DMG mode
 
     if (addr >= 0xFF00 && addr < 0xFF80) { //Special instructions
         return *(ram+addr) | (read_masks[addr&0xFF]); // set unreadable bits high
@@ -401,14 +399,14 @@ uint16_t read_word(uint16_t addr) {
 
 uint8_t read_dma(void) {
     /* read a byte from the appropriate location for DMA */
-    if  (*(ram+0xFF46) < 0x80) { // Read from ROM
-        *(ram + 0xFE00 + OAM_DMA_timeout) = read_rom((*(ram+0xFF46)<<8) + OAM_DMA_timeout);
-    } else if (*(ram+0xFF46) < 0xA0) { // Read from VRAM
-        *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (*(ram+0xFF46)<<8) + OAM_DMA_timeout);
-    } else if (*(ram+0xFF46) < 0xC0) { // Read from External RAM
-        *(ram + 0xFE00 + OAM_DMA_timeout) = read_ext_ram((*(ram+0xFF46)<<8) + OAM_DMA_timeout);
+    if  (*(ram+REG_DMA) < 0x80) { // Read from ROM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = read_rom((*(ram+REG_DMA)<<8) + OAM_DMA_timeout);
+    } else if (*(ram+REG_DMA) < 0xA0) { // Read from VRAM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (*(ram+REG_DMA)<<8) + OAM_DMA_timeout);
+    } else if (*(ram+REG_DMA) < 0xC0) { // Read from External RAM
+        *(ram + 0xFE00 + OAM_DMA_timeout) = read_ext_ram((*(ram+REG_DMA)<<8) + OAM_DMA_timeout);
     } else { // Read from WRAM
-        uint8_t high_addr = *(ram+0xFF46);
+        uint8_t high_addr = *(ram+REG_DMA);
         if (high_addr >= 0xE0) high_addr -= 0x20;
         *(ram + 0xFE00 + OAM_DMA_timeout) = *(ram + (high_addr<<8) + OAM_DMA_timeout);
     }
@@ -419,15 +417,15 @@ uint8_t read_dma(void) {
 
 void joypad_io(void) {
 
-    uint8_t old_state = *(ram+0xFF00) & 0x0F;
-    *(ram+0xFF00) |=0x0F; // set lower nibble high (no buttons pushed)
-    if (!(*(ram+0xFF00)&32)) { // read SsBA
-        *(ram+0xFF00) &= ~((joypad_state.select<<3) + (joypad_state.start<<2) + (joypad_state.B<<1) + (joypad_state.A));
+    uint8_t old_state = *(ram+REG_JOYP) & 0x0F;
+    *(ram+REG_JOYP) |=0x0F; // set lower nibble high (no buttons pushed)
+    if (!(*(ram+REG_JOYP)&32)) { // read SsBA
+        *(ram+REG_JOYP) &= ~((joypad_state.select<<3) + (joypad_state.start<<2) + (joypad_state.B<<1) + (joypad_state.A));
     } 
-    if (!(*(ram+0xFF00)&16)) { // read dpad
-        *(ram+0xFF00) &= ~((joypad_state.down<<3) + (joypad_state.up<<2) + (joypad_state.left<<1) + (joypad_state.right));
+    if (!(*(ram+REG_JOYP)&16)) { // read dpad
+        *(ram+REG_JOYP) &= ~((joypad_state.down<<3) + (joypad_state.up<<2) + (joypad_state.left<<1) + (joypad_state.right));
     }
-    if (old_state & ~(*(ram+0xFF00) & 0x0F)) {// if any bits were high and are now low
-        *(ram+0xFF0F) |= 16; // Request a joypad interrupt
+    if (old_state & ~(*(ram+REG_JOYP) & 0x0F)) {// if any bits were high and are now low
+        *(ram+REG_IF) |= 16; // Request a joypad interrupt
     }
 }

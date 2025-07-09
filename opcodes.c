@@ -306,19 +306,19 @@ static void machine_push_r16_low(void) {
 static void machine_interrupt_push_r16_high_dec_sp(void) {
     /* Handle pushing PCH to stack during interrupt handling, but test if IE is written to */
     write_byte(reg.SP, get_r16(r16)>>8);
-    if (reg.SP == 0xFFFF) {
+    if (reg.SP == REG_IE) {
         uint8_t isr = (addr - 0x40)>>3; // recover which interrupt was scheduled
-        if (!(*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F)) { // an interrupt is no longer pending!
+        if (!(*(ram+REG_IF)&*(ram+REG_IE)&0x1F)) { // an interrupt is no longer pending!
             addr = 0x0000;
         } else { // a different interrupt will be triggered instead!
             for (uint8_t new_isr=0; new_isr<5; new_isr++) {
-                if ((*(ram+0xFF0F)&*(ram+0xFFFF)&(1<<new_isr))) {
+                if ((*(ram+REG_IF)&*(ram+REG_IE)&(1<<new_isr))) {
                     addr = 0x40 + (new_isr<<3);
-                    *(ram+0xFF0F) &= ~(1<<new_isr); // disable new IF bit
+                    *(ram+REG_IF) &= ~(1<<new_isr); // disable new IF bit
                 }
             }
         }
-        *(ram+0xFF0F) |= (1<<isr); // re-enable IF bit
+        *(ram+REG_IF) |= (1<<isr); // re-enable IF bit
 
     }
     reg.SP--;
@@ -832,22 +832,22 @@ static void machine_ime_disable(void) {
 
 static void machine_stop(void) {
     /* handle entering STOP mode */
-    if ((*(ram+0xFF00)&0x0F)<0xF) { //button is being held
-        if (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F) { // interrupt is pending
+    if ((*(ram+REG_JOYP)&0x0F)<0xF) { //button is being held
+        if (*(ram+REG_IF)&*(ram+REG_IE)&0x1F) { // interrupt is pending
             reg.PC++; // stop is 1-byte, no HALT, no DIV reset
         } else {
             reg.PC += 2;
             do_haltmode = 1; // stop is 2-byte, HALT mode, no DIV reset
         }
     } else {
-        if (*(ram+0xFF0F)&*(ram+0xFFFF)&0x1F) {
+        if (*(ram+REG_IF)&*(ram+REG_IE)&0x1F) {
             reg.PC++;
             do_haltmode = 2;
-            *(ram+0xFF04) = 0; // stop is 1-byte, STOP mode, DIV reset
+            *(ram+REG_DIV) = 0; // stop is 1-byte, STOP mode, DIV reset
         } else {
             reg.PC += 2;
             do_haltmode = 2;
-            *(ram+0xFF04) = 0; // stop is 2-byte, STOP mode, DIV reset
+            *(ram+REG_DIV) = 0; // stop is 2-byte, STOP mode, DIV reset
         }
     }
 }

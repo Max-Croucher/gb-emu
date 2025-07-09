@@ -138,10 +138,10 @@ void close_audio(void) {
 
 static inline void event_length(void) {
     /* process the ticking of the length timer */
-    if ((read_byte(0xFF26)&2) && (read_byte(0xFF19)&0x40)) { // is channel 2 on and length enabled?
+    if ((read_byte(REG_NR52)&2) && (read_byte(REG_NR24)&0x40)) { // is channel 2 on and length enabled?
         channels[1].length_timer++;
         if (channels[1].length_timer >= 64) {
-            *(ram+0xFF26) &= ~2; // disable channel 2
+            *(ram+REG_NR52) &= ~2; // disable channel 2
         }
     }
 }
@@ -154,7 +154,7 @@ static inline void event_ch1_freq_sweep(void) {
 
 static inline void event_envelope_sweep(void) {
     /* process the ticking of the amplitude envelope */
-    if ((read_byte(0xFF26)&2) && (read_byte(0xFF17)&7)) { // is channel 2 on and sweep not 0 ?
+    if ((read_byte(REG_NR52)&2) && (read_byte(REG_NR22)&7)) { // is channel 2 on and sweep not 0 ?
         channels[1].sweep_timer++;
         if (channels[1].sweep_timer >= channels[1].sweep_attrs&7) { // sweep pace
             channels[1].sweep_timer = 0;
@@ -194,34 +194,34 @@ static inline void queue_sample(void) {
     */
     float samples[DEVICE_CHANNELS] = {0,0};
     bool dac_state[4] = {
-        read_byte(0xFF12) & 0xF8,
-        read_byte(0xFF17) & 0xF8,
-        read_byte(0xFF1A) & 128,
-        read_byte(0xFF21) & 0xF8
+        read_byte(REG_NR12) & 0xF8,
+        read_byte(REG_NR22) & 0xF8,
+        read_byte(REG_NR30) & 128,
+        read_byte(REG_NR42) & 0xF8
     };
     for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) { // FIX ME FOR DEAD CHANNELS - only add channels if DAC is on
         if (dac_state[i]) {
             float curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
-            if (read_byte(0xFF25) & 1 << i    ) samples[0] += curr_sample; // right
-            if (read_byte(0xFF25) & 1 << (i+4)) samples[1] += curr_sample; // left
+            if (read_byte(REG_NR51) & 1 << i    ) samples[0] += curr_sample; // right
+            if (read_byte(REG_NR51) & 1 << (i+4)) samples[1] += curr_sample; // left
             }
     }
     
     // // temp for ch2 only
     // float curr_sample = ((float)channels[1].sample_state / 7.5) - 1.0; // scale to [-1, 1]
-    // if (read_byte(0xFF25) & 2 ) samples[0] += curr_sample; // right
-    // if (read_byte(0xFF25) & 32) samples[1] += curr_sample; // left
+    // if (read_byte(REG_NR51) & 2 ) samples[0] += curr_sample; // right
+    // if (read_byte(REG_NR51) & 32) samples[1] += curr_sample; // left
 
     // at this point, each device channel's sample is in the range [-1,1]
 
     for (uint8_t i=0; i<DEVICE_CHANNELS; i++) {
         //printf(" %.4f ", samples[i]);
-        if (read_byte(0xFF24) & (1 << (3 + (4*i)))){ // is master channel on
+        if (read_byte(REG_NR50) & (1 << (3 + (4*i)))){ // is master channel on
             samples[i] = 0;
             //printf(" (%c off) ", i ? 'r' : 'l');
 
         } else {
-            samples[i] *= (float)(((read_byte(0xFF24) >> (4*i)) & 7) + 1) / 8.0; // scale by master volume
+            samples[i] *= (float)(((read_byte(REG_NR50) >> (4*i)) & 7) + 1) / 8.0; // scale by master volume
             //printf(" %.4f ", samples[i]);
             samples[i] = high_pass(samples[i], i);
             //printf(" (%c on)  ", i ? 'r' : 'l');
@@ -236,16 +236,16 @@ void handle_audio_register(uint16_t addr) {
     /* handle writing to an audio register. */
     switch (addr)
     {
-    case 0xFF19: //NR24
+    case REG_NR24: //NR24
 
-        if (read_byte(0xFF17) & 0xF8) { // only enable channel if DAC is on
-            *(ram+0xFF26) |= 2; // enable channel 2
-            if (channels[1].length_timer >= 64) channels[1].length_timer = read_byte(0xFF16)&0x63; // reset length timer if expired
-            channels[1].pulse_period = *(ram+0xFF18) + (((uint16_t)(*(ram+0xFF19)&7))<<8); // set pulse period
-            channels[1].amplitude = read_byte(0xFF17) >> 4; // set sweep amplitude
+        if (read_byte(REG_NR22) & 0xF8) { // only enable channel if DAC is on
+            *(ram+REG_NR52) |= 2; // enable channel 2
+            if (channels[1].length_timer >= 64) channels[1].length_timer = read_byte(REG_NR21)&0x63; // reset length timer if expired
+            channels[1].pulse_period = *(ram+REG_NR23) + (((uint16_t)(*(ram+REG_NR24)&7))<<8); // set pulse period
+            channels[1].amplitude = read_byte(REG_NR22) >> 4; // set sweep amplitude
             channels[1].duty_period = 0; // reset phase of pulse
             channels[1].sweep_timer = 0; // reset amplitude envelope timer
-            channels[1].sweep_attrs = read_byte(0xFF17) & 15; // store amplitude sweep pace and direction
+            channels[1].sweep_attrs = read_byte(REG_NR22) & 15; // store amplitude sweep pace and direction
         }
         break;
     
@@ -262,12 +262,12 @@ static inline void tick_channel_1(void) {
 
 static inline void tick_channel_2(void) {
     /* process the ticking of channel 2 (pulse). This function is called at a rate of 1MHz */
-    if (read_byte(0xFF26) & 2) { // is channel 2 on?
+    if (read_byte(REG_NR52) & 2) { // is channel 2 on?
         channels[1].pulse_period++;
         if (channels[1].pulse_period >= 0x7FF) { // overflow at 2047
-            channels[1].pulse_period = *(ram+0xFF18) + (((uint16_t)(*(ram+0xFF19)&7))<<8); // reset to the channel 2 period
+            channels[1].pulse_period = *(ram+REG_NR23) + (((uint16_t)(*(ram+REG_NR24)&7))<<8); // reset to the channel 2 period
 
-            uint8_t duty_limit = (read_byte(0xFF16)>>6) * 2;
+            uint8_t duty_limit = (read_byte(REG_NR21)>>6) * 2;
             if (!duty_limit) duty_limit++;
 
             if ((channels[1].duty_period%8) < duty_limit) { // sample is low

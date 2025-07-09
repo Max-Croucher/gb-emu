@@ -119,4 +119,16 @@ for i in range(SIZE):
     if i % 16 == 15:
         print(f" // 0x0{i//16:x}")
 print('};')
+
+
+print("\n\n\ntypedef enum registers{")
+
+for i in range(SIZE):
+    _, regname, addr = registers.get(i, ("xxxxxxxx", None, None))
+    if regname is not None:
+        print(f"    REG_{regname.upper():<6} = 0x{i+0xFF00:0>4x},")
+print(f"    REG_{'IE':<6} = 0x{65535:0>4x},")
+print('}registers;')
+
+
 outfile.close()

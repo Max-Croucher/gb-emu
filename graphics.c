@@ -143,7 +143,7 @@ void highlight_object(uint8_t i) {
     float right = (5 + 38.0*(i%20)+36)/1728;
     float bottom = 72.0/512*(i<20 ? 2.75 : 1.25);
     float top;
-    if ((*(ram+0xFF40)>>2)&1) {
+    if ((*(ram+REG_LCDC)>>2)&1) {
         top = 72.0/512*(i<20 ? 1.75 : 0.25);
     } else {
         top = 72.0/512*(i<20 ? 2.25 : 0.75);
@@ -238,35 +238,35 @@ void gl_tick_debug_window(void) {
     }
 	glDisable(GL_TEXTURE_2D);
     char string[64];
-    sprintf(string, "LCD Enable:    %s", ((*(ram+0xFF40)>>7)&1) ? "ON" : "OFF");
+    sprintf(string, "LCD Enable:    %s", ((*(ram+REG_LCDC)>>7)&1) ? "ON" : "OFF");
     draw_text(0.16,0.96, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "Window Map:    %s", ((*(ram+0xFF40)>>6)&1) ? "9C00-9FFF" : "9800-9BFF");
+    sprintf(string, "Window Map:    %s", ((*(ram+REG_LCDC)>>6)&1) ? "9C00-9FFF" : "9800-9BFF");
     draw_text(0.16,0.93, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "Window Enable: %s", ((*(ram+0xFF40)>>5)&1) ? "ON" : "OFF");
+    sprintf(string, "Window Enable: %s", ((*(ram+REG_LCDC)>>5)&1) ? "ON" : "OFF");
     draw_text(0.16,0.90, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "W/BG Tiledata: %s", ((*(ram+0xFF40)>>4)&1) ? "8000-8FFF" : "8800-97FF");
+    sprintf(string, "W/BG Tiledata: %s", ((*(ram+REG_LCDC)>>4)&1) ? "8000-8FFF" : "8800-97FF");
     draw_text(0.16,0.87, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "Backround Map: %s", ((*(ram+0xFF40)>>3)&1) ? "9C00-9FFF" : "9800-9BFF");
+    sprintf(string, "Backround Map: %s", ((*(ram+REG_LCDC)>>3)&1) ? "9C00-9FFF" : "9800-9BFF");
     draw_text(0.16,0.84, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "OBJ Size:      %s", ((*(ram+0xFF40)>>2)&1) ? "8x16" : "8x8");
+    sprintf(string, "OBJ Size:      %s", ((*(ram+REG_LCDC)>>2)&1) ? "8x16" : "8x8");
     draw_text(0.16,0.81, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "OBJ Enable:    %s", ((*(ram+0xFF40)>>1)&1) ? "ON" : "OFF");
+    sprintf(string, "OBJ Enable:    %s", ((*(ram+REG_LCDC)>>1)&1) ? "ON" : "OFF");
     draw_text(0.16,0.78, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "W/BG Enable:   %s", ((*(ram+0xFF40)>>0)&1) ? "ON" : "OFF");
+    sprintf(string, "W/BG Enable:   %s", ((*(ram+REG_LCDC)>>0)&1) ? "ON" : "OFF");
     draw_text(0.16,0.75, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "LY | LYC  = 0x%.2X | 0x%.2X", *(ram+0xFF44), *(ram+0xFF45));
+    sprintf(string, "LY | LYC  = 0x%.2X | 0x%.2X", *(ram+REG_LY), *(ram+REG_LYC));
     draw_text(0.16,0.72, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "STAT      = 0b %d%d%d%d %d%d%d%d", (*(ram+0xFF41)>>7)&1,(*(ram+0xFF41)>>6)&1,(*(ram+0xFF41)>>5)&1,(*(ram+0xFF41)>>4)&1,(*(ram+0xFF41)>>3)&1,(*(ram+0xFF41)>>2)&1,(*(ram+0xFF41)>>1)&1,(*(ram+0xFF41)>>0)&1);
+    sprintf(string, "STAT      = 0b %d%d%d%d %d%d%d%d", (*(ram+REG_STAT)>>7)&1,(*(ram+REG_STAT)>>6)&1,(*(ram+REG_STAT)>>5)&1,(*(ram+REG_STAT)>>4)&1,(*(ram+REG_STAT)>>3)&1,(*(ram+REG_STAT)>>2)&1,(*(ram+REG_STAT)>>1)&1,(*(ram+REG_STAT)>>0)&1);
     draw_text(0.16,0.69, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "SCX | SCY = 0x%.2X | 0x%.2X", *(ram+0xFF43), *(ram+0xFF42));
+    sprintf(string, "SCX | SCY = 0x%.2X | 0x%.2X", *(ram+REG_SCX), *(ram+REG_SCY));
     draw_text(0.16,0.66, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "WX+7 | WY = 0x%.2X | 0x%.2X", *(ram+0xFF4B), *(ram+0xFF4A));
+    sprintf(string, "WX+7 | WY = 0x%.2X | 0x%.2X", *(ram+REG_WY), *(ram+REG_WX));
     draw_text(0.16,0.63, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "W Count   = 0x%.2X", window_internal_counter);
     draw_text(0.16,0.60, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "BGP       = 0x%.2X", *(ram+0xFF47));
+    sprintf(string, "BGP       = 0x%.2X", *(ram+REG_BGP));
     draw_text(0.16,0.57, GLUT_BITMAP_9_BY_15, string);
-    sprintf(string, "OBP0|OBP1 = 0x%.2X | 0x%.2X", *(ram+0xFF48), *(ram+0xFF49));
+    sprintf(string, "OBP0|OBP1 = 0x%.2X | 0x%.2X", *(ram+REG_OBP0), *(ram+REG_OBP1));
     draw_text(0.16,0.54, GLUT_BITMAP_9_BY_15, string);
 
     draw_text(0.00222,0.4, GLUT_BITMAP_9_BY_15, "0x00");
@@ -384,7 +384,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     //start
     glutMainLoopEvent();
     start = clock();
-    *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
+    *(ram+REG_STAT) &= 0xFC; // set ppu mode to 0
 }
 
 
@@ -504,7 +504,7 @@ uint16_t interleave(uint16_t a, uint16_t b) {
 
 uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
     uint16_t base_addr;
-    if ((is_window_layer && (*(ram+0xFF40)&64)) || ((!is_window_layer) && (*(ram+0xFF40)&8))) {
+    if ((is_window_layer && (*(ram+REG_LCDC)&64)) || ((!is_window_layer) && (*(ram+REG_LCDC)&8))) {
         base_addr = 0x9C00;
     } else {
         base_addr = 0x9800;
@@ -514,7 +514,7 @@ uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
 
 uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
     /* get the memory address of a tile from the tile id and the addressing mode register */
-    if (is_object || (*(ram+0xFF40)&16)) { // UNSIGNED addressing from 0x8000
+    if (is_object || (*(ram+REG_LCDC)&16)) { // UNSIGNED addressing from 0x8000
         return 0x8000 + tile_id*16;
     } else {// SIGNED addressing from 0x9000
         tile_id ^= 128;
@@ -536,8 +536,8 @@ void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
 void read_objects(void) {
     /* builds an array of up to 10 object attributes that intersect with the current scanline */
     objects_found = 0;
-    uint8_t offset_scanline = *(ram+0xFF44) + 16;
-    bool tile8x16 = *(ram+0xFF40) & 4; //1 if 8x8, 0 if 8x16
+    uint8_t offset_scanline = *(ram+REG_LY) + 16;
+    bool tile8x16 = *(ram+REG_LCDC) & 4; //1 if 8x8, 0 if 8x16
     for (int i=0; i<40; i++) {
         if (objects_found == 10) break;
         uint8_t ypos = *(ram+0xFE00+(i*4));
@@ -564,16 +564,16 @@ void read_objects(void) {
 
 uint8_t get_background_palette(uint8_t palette_value) {
     /* poll the BGP register */
-    return (*(ram+0xFF47) >> (2*palette_value))&3;
+    return (*(ram+REG_BGP) >> (2*palette_value))&3;
 }
 
 
 uint8_t get_object_palette(bool palette_id, uint8_t palette_value) {
     /* poll the BGP register */
     if (palette_id) {
-        return (*(ram+0xFF49) >> (2*palette_value))&3;
+        return (*(ram+REG_OBP1) >> (2*palette_value))&3;
     }
-    return (*(ram+0xFF48) >> (2*palette_value))&3;
+    return (*(ram+REG_OBP0) >> (2*palette_value))&3;
 }
 
 
@@ -588,16 +588,16 @@ int compare_obj_xvalue(const void *a, const void *b) {
 
 void draw_background() {
     /* Draw the background layer on the current scanline */
-    if ((*(ram+0xFF40)&1) == 0) { //bg is disabled
+    if ((*(ram+REG_LCDC)&1) == 0) { //bg is disabled
         for (int i=0; i<160; i++) {
-            texture[143-*(ram+0xFF44)][i][0] = pixvals[0][0];
-            texture[143-*(ram+0xFF44)][i][1] = pixvals[0][1];
-            texture[143-*(ram+0xFF44)][i][2] = pixvals[0][2];
+            texture[143-*(ram+REG_LY)][i][0] = pixvals[0][0];
+            texture[143-*(ram+REG_LY)][i][1] = pixvals[0][1];
+            texture[143-*(ram+REG_LY)][i][2] = pixvals[0][2];
         }
         return;
     }
-    uint8_t top = *(ram+0xFF44) + *(ram+0xFF42); //get scroll vals
-    uint8_t left = *(ram+0xFF43);
+    uint8_t top = *(ram+REG_LY) + *(ram+REG_SCY); //get scroll vals
+    uint8_t left = *(ram+REG_SCX);
     uint16_t tiles[21][8];
     for (uint8_t i=0; i<21; i++) {
         uint8_t tile_id = get_tile_id((((left>>3)+i)%32) + (top>>3)*32, 0);
@@ -606,37 +606,37 @@ void draw_background() {
 
     for (uint8_t i=0; i<160; i++) {
         uint8_t pix = (tiles[((i+left%8))>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
-        bgw_priority_map[143-*(ram+0xFF44)][i] = (bool)pix;
-        texture[143-*(ram+0xFF44)][i][0] = pixvals[get_background_palette(pix)][0];
-        texture[143-*(ram+0xFF44)][i][1] = pixvals[get_background_palette(pix)][1];
-        texture[143-*(ram+0xFF44)][i][2] = pixvals[get_background_palette(pix)][2];
+        bgw_priority_map[143-*(ram+REG_LY)][i] = (bool)pix;
+        texture[143-*(ram+REG_LY)][i][0] = pixvals[get_background_palette(pix)][0];
+        texture[143-*(ram+REG_LY)][i][1] = pixvals[get_background_palette(pix)][1];
+        texture[143-*(ram+REG_LY)][i][2] = pixvals[get_background_palette(pix)][2];
     }
 }
 
 
 void draw_window() {
     /* Draw the window layer on the current scanline */
-    if ((*(ram+0xFF40)&0x21) == 0x21) { // Window Enable and BG/Window Enable bits are set
-        if (*(ram+0xFF44) >= *(ram+0xFF4A)) { // when scanline >= window Y
+    if ((*(ram+REG_LCDC)&0x21) == 0x21) { // Window Enable and BG/Window Enable bits are set
+        if (*(ram+REG_LY) >= *(ram+REG_WX)) { // when scanline >= window Y
             bool pixel_drawn = 0;
             uint16_t tiles[21][8];
             for (int i=0; i<21; i++) {
                 uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 1);
                 load_tile(tiles[i], get_tile_addr(tile_id, 0));
             }
-            for (int screen_x_pos = *(ram+0xFF4B) - 7; screen_x_pos < 160; screen_x_pos++) {
+            for (int screen_x_pos = *(ram+REG_WY) - 7; screen_x_pos < 160; screen_x_pos++) {
                 pixel_drawn = 1;
-                uint8_t window_x_pos = screen_x_pos - (*(ram+0xFF4B) - 7);
-                //screen_y_pos is *(ram+0xFF44)
+                uint8_t window_x_pos = screen_x_pos - (*(ram+REG_WY) - 7);
+                //screen_y_pos is *(ram+REG_LY)
                 //window_y_pos is window_internal_counter
 
 
                 //draw pixel at (window_x_pos, window_y_pos) to (screen_x_pos, screen_y_pos)
                 uint8_t pix = (tiles[window_x_pos>>3][window_internal_counter%8] >> (14-(2*((window_x_pos%8)))))&3;
-                bgw_priority_map[143-*(ram+0xFF44)][screen_x_pos] |= (bool)pix;
-                texture[143-*(ram+0xFF44)][screen_x_pos][0] = pixvals[get_background_palette(pix)][0];
-                texture[143-*(ram+0xFF44)][screen_x_pos][1] = pixvals[get_background_palette(pix)][1];
-                texture[143-*(ram+0xFF44)][screen_x_pos][2] = pixvals[get_background_palette(pix)][2];
+                bgw_priority_map[143-*(ram+REG_LY)][screen_x_pos] |= (bool)pix;
+                texture[143-*(ram+REG_LY)][screen_x_pos][0] = pixvals[get_background_palette(pix)][0];
+                texture[143-*(ram+REG_LY)][screen_x_pos][1] = pixvals[get_background_palette(pix)][1];
+                texture[143-*(ram+REG_LY)][screen_x_pos][2] = pixvals[get_background_palette(pix)][2];
             }
             if (pixel_drawn) window_internal_counter++;
         }
@@ -646,10 +646,10 @@ void draw_window() {
 
 void draw_objects(void) {
     /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
-    if (((*(ram+0xFF40))&2) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
+    if (((*(ram+REG_LCDC))&2) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
         uint16_t tiles[20][8];
         for (int8_t i = objects_found-1; i >= 0; i--) {
-            if ((*(ram+0xFF40))&4) { // object 8x16 mode
+            if ((*(ram+REG_LCDC))&4) { // object 8x16 mode
                 load_tile(tiles[2*i], get_tile_addr(objects[i].tileid&0xFE, 1)); // &0xFE force-resets lower bit
                 load_tile(tiles[2*i+1], get_tile_addr(objects[i].tileid|0x01, 1)); // |0x01 force-sets lower bit
             } else {
@@ -660,11 +660,11 @@ void draw_objects(void) {
                     ObjectAttribute target_object = objects[i];
                     uint8_t sprite_x = screen_x - (target_object.xpos-8);
                     if (!target_object.xflip) sprite_x = 7 - sprite_x;
-                    uint8_t sprite_y = *(ram+0xFF44) - (target_object.ypos-16);
-                    if (target_object.yflip && !((*(ram+0xFF40))&4)) sprite_y = 7 - sprite_y;
-                    if (target_object.yflip && ((*(ram+0xFF40))&4)) sprite_y = 15 - sprite_y;
+                    uint8_t sprite_y = *(ram+REG_LY) - (target_object.ypos-16);
+                    if (target_object.yflip && !((*(ram+REG_LCDC))&4)) sprite_y = 7 - sprite_y;
+                    if (target_object.yflip && ((*(ram+REG_LCDC))&4)) sprite_y = 15 - sprite_y;
                     uint16_t tile_line;
-                    if (!((*(ram+0xFF40))&4)) { // object 8x8 mode
+                    if (!((*(ram+REG_LCDC))&4)) { // object 8x8 mode
                         tile_line = tiles[i][sprite_y];
                     } else { // object 8x16 mode
                         if (sprite_y < 8) {
@@ -674,10 +674,10 @@ void draw_objects(void) {
                         }
                     }
                     uint8_t pixel = (tile_line>>(2*sprite_x))&3;
-                    if (pixel && !(target_object.priority & bgw_priority_map[143-*(ram+0xFF44)][screen_x])) { // skip if transparent and background does not have priority
-                        texture[143-*(ram+0xFF44)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][0];
-                        texture[143-*(ram+0xFF44)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][1];
-                        texture[143-*(ram+0xFF44)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][2];
+                    if (pixel && !(target_object.priority & bgw_priority_map[143-*(ram+REG_LY)][screen_x])) { // skip if transparent and background does not have priority
+                        texture[143-*(ram+REG_LY)][screen_x][0] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][0];
+                        texture[143-*(ram+REG_LY)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][1];
+                        texture[143-*(ram+REG_LY)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][2];
                     }
                 }
             }
@@ -689,35 +689,35 @@ void draw_objects(void) {
 bool tick_graphics(void) {
     /* Main tick procedure for graphics */
 
-    if (lcd_enable ^ (*(ram+0xFF40)>>7)) { //lcd state change
-        if (*(ram+0xFF40)>>7) { // LCD was just turned on
+    if (lcd_enable ^ (*(ram+REG_LCDC)>>7)) { //lcd state change
+        if (*(ram+REG_LCDC)>>7) { // LCD was just turned on
             lcd_enable = 1;
         } else { // LCD was just turned off
             dot = 0;
             lcd_enable = 0;
-            *(ram+0xFF41) &= 0xFC;
-            *(ram+0xFF41) += 0; // set ppu mode to 0
+            *(ram+REG_STAT) &= 0xFC;
+            *(ram+REG_STAT) += 0; // set ppu mode to 0
             blank_screen();
         }
     }
-    *(ram+0xFF44) = (dot/456); // LY (scanline)
-    *(ram+0xFF41) &= 0xFB;
-    *(ram+0xFF41) |= (*(ram+0xFF44) == *(ram+0xFF45))<<2; // set LY=LYC flag
+    *(ram+REG_LY) = (dot/456); // LY (scanline)
+    *(ram+REG_STAT) &= 0xFB;
+    *(ram+REG_STAT) |= (*(ram+REG_LY) == *(ram+REG_LYC))<<2; // set LY=LYC flag
 
     bool current_stat_state = (
-        ((*(ram+0xFF41)&0x40)   && ((*(ram+0xFF41)>>2)&1))   || // LY=LYC is set
-        (((*(ram+0xFF41)>>5)&1) && ((*(ram+0xFF41)&3) == 2)) || // mode 2 is set & ppu is in mode 2
-        (((*(ram+0xFF41)>>4)&1) && ((*(ram+0xFF41)&3) == 1)) || // mode 1 is set & ppu is in mode 1
-        (((*(ram+0xFF41)>>3)&1) && ((*(ram+0xFF41)&3) == 0)) // mode 0 is set & ppu is in mode 0
+        ((*(ram+REG_STAT)&0x40)   && ((*(ram+REG_STAT)>>2)&1))   || // LY=LYC is set
+        (((*(ram+REG_STAT)>>5)&1) && ((*(ram+REG_STAT)&3) == 2)) || // mode 2 is set & ppu is in mode 2
+        (((*(ram+REG_STAT)>>4)&1) && ((*(ram+REG_STAT)&3) == 1)) || // mode 1 is set & ppu is in mode 1
+        (((*(ram+REG_STAT)>>3)&1) && ((*(ram+REG_STAT)&3) == 0)) // mode 0 is set & ppu is in mode 0
     );
-    if ((!old_stat_state) && current_stat_state) *(ram+0xFF0F) |= 2; // Request a STAT interrupt
+    if ((!old_stat_state) && current_stat_state) *(ram+REG_IF) |= 2; // Request a STAT interrupt
     old_stat_state = current_stat_state;
 
     if (lcd_enable) {
         if (dot == 65564) { // enter VBLANK
-            *(ram+0xFF41) &= 0xFC;
-            *(ram+0xFF41) += 1; // set ppu mode to 1
-            *(ram+0xFF0F) |= 1; // Request a VBlank interrupt
+            *(ram+REG_STAT) &= 0xFC;
+            *(ram+REG_STAT) += 1; // set ppu mode to 1
+            *(ram+REG_IF) |= 1; // Request a VBlank interrupt
             xoffset++;
             if (xoffset == 144) xoffset = 0;
             window_internal_counter = 0;
@@ -745,14 +745,14 @@ bool tick_graphics(void) {
             } else {
                 framerate();
             }
-        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 0) { // New scanline
-            *(ram+0xFF41) &= 0xFC;
-            *(ram+0xFF41) += 2; // set ppu mode to 2
+        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 0) { // New scanline
+            *(ram+REG_STAT) &= 0xFC;
+            *(ram+REG_STAT) += 2; // set ppu mode to 2
             read_objects();
             qsort(objects, objects_found, sizeof(ObjectAttribute), compare_obj_xvalue);
-        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 80) { // Enter drawing mode
-            *(ram+0xFF41) &= 0xFC;
-            *(ram+0xFF41) += 3; // set ppu mode to 3
+        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 80) { // Enter drawing mode
+            *(ram+REG_STAT) &= 0xFC;
+            *(ram+REG_STAT) += 3; // set ppu mode to 3
             draw_background();
             draw_window();
             draw_objects();
@@ -760,8 +760,8 @@ bool tick_graphics(void) {
                 debug_tile_boundaries();
             }
 
-        } else if ((*(ram+0xFF44) < 144) && (dot % 456) == 232) { // Enter Hblank
-            *(ram+0xFF41) &= 0xFC; // set ppu mode to 0
+        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 232) { // Enter Hblank
+            *(ram+REG_STAT) &= 0xFC; // set ppu mode to 0
             if (debug_scanlines) {
                 if (debug_frames_done >= debug_frameskip) {
                     getchar();
@@ -843,29 +843,29 @@ void debug_tilemaps(void) {
             debug_draw_background_tile(tile, window_tilemap, x, y);
         }
     }
-    uint8_t bg_scanline = *(ram+0xFF44) + *(ram+0xFF42);
+    uint8_t bg_scanline = *(ram+REG_LY) + *(ram+REG_SCY);
 
     for (int x=0; x<161; x++) {
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42))]     [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+144)] [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
     }
     for (int y=0; y<144; y++) {
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43))]     [2] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+0xFF42)+y)]   [(uint8_t)(*(ram+0xFF43)+160)] [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [2] = 0;
     }
     if (debug_scanlines) {
         for (int x=0; x<161; x++) {
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [0] = 0;
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [1] = 0;
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+0xFF43)+x)]   [2] = 255;
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 0;
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 255;
         }
     }
 }
@@ -889,7 +889,7 @@ void debug_sprites(void) {
         uint16_t sprite[8];
         load_tile(sprite, get_tile_addr(object.tileid, 1));
         debug_draw_sprite_tile(sprite, i, object.yflip, object);
-        if (*(ram+0xFF40)&4) { // 8x16 sprites
+        if (*(ram+REG_LCDC)&4) { // 8x16 sprites
             load_tile(sprite, get_tile_addr(object.tileid+1, 1));
             debug_draw_sprite_tile(sprite, i, !object.yflip, object);
         } else {
@@ -900,10 +900,10 @@ void debug_sprites(void) {
 
 void debug_tile_boundaries(void) {
     for (uint8_t x=0; x<160; x++) {
-        if (!((*(ram + 0xFF44) | x)&7)) {
-            texture[143-*(ram + 0xFF44)][x][0] = 255;
-            texture[143-*(ram + 0xFF44)][x][1] = 0;
-            texture[143-*(ram + 0xFF44)][x][2] = 0;
+        if (!((*(ram + REG_LY) | x)&7)) {
+            texture[143-*(ram + REG_LY)][x][0] = 255;
+            texture[143-*(ram + REG_LY)][x][1] = 0;
+            texture[143-*(ram + REG_LY)][x][2] = 0;
         }
     }
 }
