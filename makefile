@@ -13,7 +13,7 @@ rom.o: rom.c rom.h
 	$(CC) -c $(CFLAGS) $< -o $@
 graphics.o: graphics.c graphics.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@ -lglut -lGL
-audio.o: audio.c audio.h miniaudio.h
+audio.o: audio.c audio.h miniaudio.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@ -ldl -lpthread -lm
 
 gbemu: main.o cpu.o rom.o opcodes.o graphics.o audio.o

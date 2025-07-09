@@ -7,6 +7,8 @@
 #ifndef CPU_H
 #define CPU_H
 
+#define CLK_HZ 4194304UL
+
 typedef struct {
     uint16_t AF;
     uint16_t BC;

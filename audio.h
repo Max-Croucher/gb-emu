@@ -13,9 +13,16 @@
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 void init_audio(void);
 void close_audio(void);
-void event_length(void);
-void event_ch1_freq_sweep(void);
-void event_envelope_sweep(void);
+static inline void event_length(void);
+static inline void event_ch1_freq_sweep(void);
+static inline void event_envelope_sweep(void);
+static inline void write_to_buf(float val);
+static inline void queue_sample(void);
+void handle_audio_register(uint16_t addr);
+static inline void tick_channel_1(void);
+static inline void tick_channel_2(void);
+static inline void tick_channel_3(void);
+static inline void tick_channel_4(void);
 void tick_audio(void);
 
 #endif //AUDIO

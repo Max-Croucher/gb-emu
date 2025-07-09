@@ -25,7 +25,6 @@ bool TIMA_overflow_flag = 0; //extern
 bool timer_last_state = 0;
 bool do_div_reset;
 uint16_t div_reset_old_sysclk;
-extern uint16_t system_counter;
 extern void (*write_MBANK_register)(uint16_t, uint8_t);
 extern uint8_t (*read_rom)(uint32_t);
 extern void (*write_ext_ram)(uint16_t, uint8_t);
@@ -345,6 +344,10 @@ void write_byte(uint16_t addr, uint8_t byte) {
         uint8_t mask = write_masks[addr&0xFF];
         *(ram+addr) &= ~mask; // set to-be-written bits low
         *(ram+addr) |= byte&mask; // write only the masked bits
+
+        if (addr >= 0xFF10 && addr < 0xFF3F) { // Audio registers
+            handle_audio_register(addr);
+        }
         return;
     }
 
