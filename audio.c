@@ -31,23 +31,29 @@ static uint16_t gb_sample_index = 0;
 static double capacitors[DEVICE_CHANNELS] = {0.0};
 static uint16_t audio_sample_divider = CLK_HZ / DEVICE_SAMPLE_RATE;
 
+static uint16_t REG_NRx1[4] = {REG_NR11,REG_NR21,REG_NR31,REG_NR41};
+static uint16_t REG_NRx2[4] = {REG_NR12,REG_NR22,REG_NR32,REG_NR42};
+static uint16_t REG_NRx3[4] = {REG_NR13,REG_NR23,REG_NR33,REG_NR43};
+static uint16_t REG_NRx4[4] = {REG_NR14,REG_NR24,REG_NR34,REG_NR44};
+
 typedef struct channel_attributes {
     uint8_t sample_state;
     uint8_t length_timer;
-    uint8_t sweep_timer;
-    uint8_t sweep_attrs;
+    uint8_t amp_sweep_timer;
+    uint8_t amp_sweep_attrs;
     uint8_t amplitude;
     uint8_t duty_period;
     uint16_t pulse_period;
+
 }channel_attributes;
 
 static channel_attributes channels[GAMEBOY_CHANNELS];
 
-ma_waveform ch2_waveform;
+ma_waveform master_waveform;
 ma_device device;
 
-static float flip_flop_state = 0.2;
-static uint16_t flip_flop_timer = 100;
+ uint8_t ch1_freq_sweep_timer = 0;;
+
 
 static uint32_t buf_readpos = 0;
 static uint32_t buf_writepos = 0;
@@ -99,7 +105,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 void init_audio(void) {
     /* initialise the audio controller */
     ma_device_config device_config;
-    ma_waveform_config ch2_waveform_config;
+    ma_waveform_config master_waveform_config;
 
     //raw_audio_file = fopen("raw_audio.waveform", "wb");
 
@@ -108,15 +114,15 @@ void init_audio(void) {
     device_config.playback.channels = DEVICE_CHANNELS;
     device_config.sampleRate        = DEVICE_SAMPLE_RATE;
     device_config.dataCallback      = data_callback;
-    device_config.pUserData         = &ch2_waveform;
+    device_config.pUserData         = &master_waveform;
 
     if (ma_device_init(NULL, &device_config, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
         exit(EXIT_FAILURE);
     }
     printf("Loaded audio device %s\n", device.playback.name);
-    ch2_waveform_config = ma_waveform_config_init(device.playback.format, device.playback.channels, device.sampleRate, ma_waveform_type_square, 0.2, 240);
-    ma_waveform_init(&ch2_waveform_config, &ch2_waveform);
+    master_waveform_config = ma_waveform_config_init(device.playback.format, device.playback.channels, device.sampleRate, ma_waveform_type_square, 0.2, 240);
+    ma_waveform_init(&master_waveform_config, &master_waveform);
 
     if (ma_device_start(&device) != MA_SUCCESS) {
         printf("Failed to start playback device.\n");
@@ -132,16 +138,18 @@ void init_audio(void) {
 void close_audio(void) {
     /* close the audio devices */
     ma_device_uninit(&device);
-    ma_waveform_uninit(&ch2_waveform);  /* Uninitialize the waveform after the device so we don't pull it from under the device while it's being reference in the data callback. */
+    ma_waveform_uninit(&master_waveform);  /* Uninitialize the waveform after the device so we don't pull it from under the device while it's being reference in the data callback. */
 }
 
 
 static inline void event_length(void) {
     /* process the ticking of the length timer */
-    if ((read_byte(REG_NR52)&2) && (read_byte(REG_NR24)&0x40)) { // is channel 2 on and length enabled?
-        channels[1].length_timer++;
-        if (channels[1].length_timer >= 64) {
-            *(ram+REG_NR52) &= ~2; // disable channel 2
+    for (uint8_t i=0; i<2; i++) {
+        if ((read_byte(REG_NR52)&(1<<i)) && (read_byte(REG_NRx4[i])&0x40)) { // is channel i on and length enabled?
+            channels[i].length_timer++;
+            if (channels[i].length_timer >= 64) {
+                *(ram+REG_NR52) &= ~(1<<i); // disable channel i
+            }
         }
     }
 }
@@ -149,19 +157,46 @@ static inline void event_length(void) {
 
 static inline void event_ch1_freq_sweep(void) {
     /* process the ticking of channel 1's frequency sweep */
+    uint8_t step = *(ram+REG_NR10)&7;
+    bool direction = *(ram+REG_NR10)&8;
+    uint8_t pace = (*(ram+REG_NR10)>>4)&7;
+
+    uint16_t delta = channels[0].pulse_period / (uint16_t)pow(2, step);
+
+    if (direction && channels[0].pulse_period + delta > 0x7FF) { // pending overflow; immediately disable
+        *(ram+REG_NR52) &= ~1; // disable channel 1
+        return;
+    }
+
+    // otherwise, proceed as normal
+    if ((read_byte(REG_NR10)>>4)&7) { // only tick if pace is not 0
+        ch1_freq_sweep_timer--;
+        if (ch1_freq_sweep_timer == 0) { // change freq
+            if (direction) {
+                channels[0].pulse_period += delta;
+            } else {
+                channels[0].pulse_period -= delta;
+            }
+            *(ram+REG_NR13) = channels[0].pulse_period & 0xFF;
+            *(ram+REG_NR13) &= 0xF8;
+            *(ram+REG_NR13) |= channels[0].pulse_period>>8;
+        }
+    }
 }
 
 
 static inline void event_envelope_sweep(void) {
     /* process the ticking of the amplitude envelope */
-    if ((read_byte(REG_NR52)&2) && (read_byte(REG_NR22)&7)) { // is channel 2 on and sweep not 0 ?
-        channels[1].sweep_timer++;
-        if (channels[1].sweep_timer >= channels[1].sweep_attrs&7) { // sweep pace
-            channels[1].sweep_timer = 0;
-            if (channels[1].sweep_attrs&8) { // env dir
-                if (channels[1].amplitude != 15) channels[1].amplitude++;
-            } else {
-                if (channels[1].amplitude != 0) channels[1].amplitude--;
+    for (uint8_t i=0; i<2; i++) {
+        if ((read_byte(REG_NR52)&(1<<i)) && (read_byte(REG_NRx2[i])&7)) { // is channel i on and sweep not 0 ?
+            channels[i].amp_sweep_timer++;
+            if (channels[i].amp_sweep_timer >= channels[i].amp_sweep_attrs&7) { // sweep pace
+                channels[i].amp_sweep_timer = 0;
+                if (channels[i].amp_sweep_attrs&8) { // env dir
+                    if (channels[i].amplitude != 15) channels[i].amplitude++;
+                } else {
+                    if (channels[i].amplitude != 0) channels[i].amplitude--;
+                }
             }
         }
     }
@@ -199,18 +234,13 @@ static inline void queue_sample(void) {
         read_byte(REG_NR30) & 128,
         read_byte(REG_NR42) & 0xF8
     };
-    for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) { // FIX ME FOR DEAD CHANNELS - only add channels if DAC is on
+    for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) {
         if (dac_state[i]) {
             float curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
             if (read_byte(REG_NR51) & 1 << i    ) samples[0] += curr_sample; // right
             if (read_byte(REG_NR51) & 1 << (i+4)) samples[1] += curr_sample; // left
             }
     }
-    
-    // // temp for ch2 only
-    // float curr_sample = ((float)channels[1].sample_state / 7.5) - 1.0; // scale to [-1, 1]
-    // if (read_byte(REG_NR51) & 2 ) samples[0] += curr_sample; // right
-    // if (read_byte(REG_NR51) & 32) samples[1] += curr_sample; // left
 
     // at this point, each device channel's sample is in the range [-1,1]
 
@@ -232,21 +262,30 @@ static inline void queue_sample(void) {
 }
 
 
+void enable_pulse_channel(bool channel_id) {
+    /* start a pulse channel */
+    if (read_byte(REG_NRx2[channel_id]) & 0xF8) { // only enable channel if DAC is on
+        *(ram+REG_NR52) |= (1<<channel_id); // enable channel
+        if (channels[channel_id].length_timer >= 64) channels[channel_id].length_timer = read_byte(REG_NRx1[channel_id])&0x63; // reset length timer if expired
+        channels[channel_id].pulse_period = *(ram+REG_NRx3[channel_id]) + (((uint16_t)(*(ram+REG_NRx4[channel_id])&7))<<8); // set pulse period
+        channels[channel_id].amplitude = read_byte(REG_NRx2[channel_id]) >> 4; // set sweep amplitude
+        channels[channel_id].duty_period = 0; // reset phase of pulse
+        channels[channel_id].amp_sweep_timer = 0; // reset amplitude envelope timer
+        channels[channel_id].amp_sweep_attrs = read_byte(REG_NRx2[channel_id]) & 15; // store amplitude sweep pace and direction
+    }
+}
+
+
 void handle_audio_register(uint16_t addr) {
     /* handle writing to an audio register. */
     switch (addr)
     {
-    case REG_NR24: //NR24
-
-        if (read_byte(REG_NR22) & 0xF8) { // only enable channel if DAC is on
-            *(ram+REG_NR52) |= 2; // enable channel 2
-            if (channels[1].length_timer >= 64) channels[1].length_timer = read_byte(REG_NR21)&0x63; // reset length timer if expired
-            channels[1].pulse_period = *(ram+REG_NR23) + (((uint16_t)(*(ram+REG_NR24)&7))<<8); // set pulse period
-            channels[1].amplitude = read_byte(REG_NR22) >> 4; // set sweep amplitude
-            channels[1].duty_period = 0; // reset phase of pulse
-            channels[1].sweep_timer = 0; // reset amplitude envelope timer
-            channels[1].sweep_attrs = read_byte(REG_NR22) & 15; // store amplitude sweep pace and direction
-        }
+    case REG_NR14: // channel 1
+        enable_pulse_channel(0);
+        ch1_freq_sweep_timer = (read_byte(REG_NR10)>>4)&7;
+        break;
+    case REG_NR24: // channel 2
+        enable_pulse_channel(1);
         break;
     
     default:
@@ -255,29 +294,24 @@ void handle_audio_register(uint16_t addr) {
 }
 
 
-static inline void tick_channel_1(void) {
-    /* process the ticking of channel 1 (pulse + sweep) */
-}
+static inline void tick_pulse_channel(bool channel_id) {
+    /* process the ticking of channel 1 or 2 (pulse). This function is called at a rate of 1MHz */
+    if (read_byte(REG_NR52) & (1<<channel_id)) { // is channel on?
+        channels[channel_id].pulse_period++;
+        if (channels[channel_id].pulse_period >= 0x7FF) { // overflow at 2047
+            channels[channel_id].pulse_period = *(ram+REG_NRx3[channel_id]) + (((uint16_t)(*(ram+REG_NRx4[channel_id])&7))<<8); // reset to the channel period
 
-
-static inline void tick_channel_2(void) {
-    /* process the ticking of channel 2 (pulse). This function is called at a rate of 1MHz */
-    if (read_byte(REG_NR52) & 2) { // is channel 2 on?
-        channels[1].pulse_period++;
-        if (channels[1].pulse_period >= 0x7FF) { // overflow at 2047
-            channels[1].pulse_period = *(ram+REG_NR23) + (((uint16_t)(*(ram+REG_NR24)&7))<<8); // reset to the channel 2 period
-
-            uint8_t duty_limit = (read_byte(REG_NR21)>>6) * 2;
+            uint8_t duty_limit = (read_byte(REG_NRx1[channel_id])>>6) * 2;
             if (!duty_limit) duty_limit++;
 
-            if ((channels[1].duty_period%8) < duty_limit) { // sample is low
-                channels[1].sample_state = 0;
+            if ((channels[channel_id].duty_period%8) < duty_limit) { // sample is low
+                channels[channel_id].sample_state = 0;
                 //fprintf(stdout, "<");
             } else { // sample is high
-                channels[1].sample_state = channels[1].amplitude;
+                channels[channel_id].sample_state = channels[channel_id].amplitude;
                 //fprintf(stdout, ">");
             }
-            channels[1].duty_period++;
+            channels[channel_id].duty_period++;
         }
     }
 }
@@ -304,8 +338,8 @@ inline void tick_audio(void) {
         div_apu++;
     }
     if (system_counter % 4 == 0) {
-        tick_channel_1();
-        tick_channel_2();
+        tick_pulse_channel(0);
+        tick_pulse_channel(1);
     }
     // tick_channel_3();
     // tick_channel_4();
