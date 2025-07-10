@@ -36,24 +36,14 @@ static uint16_t REG_NRx2[4] = {REG_NR12,REG_NR22,REG_NR32,REG_NR42};
 static uint16_t REG_NRx3[4] = {REG_NR13,REG_NR23,REG_NR33,REG_NR43};
 static uint16_t REG_NRx4[4] = {REG_NR14,REG_NR24,REG_NR34,REG_NR44};
 
-typedef struct channel_attributes {
-    uint8_t sample_state;
-    uint8_t length_timer;
-    uint8_t amp_sweep_timer;
-    uint8_t amp_sweep_attrs;
-    uint8_t amplitude;
-    uint8_t duty_period;
-    uint16_t pulse_period;
-
-}channel_attributes;
-
 static channel_attributes channels[GAMEBOY_CHANNELS];
 
 ma_waveform master_waveform;
 ma_device device;
 
- uint8_t ch1_freq_sweep_timer = 0;;
-
+uint8_t ch1_freq_sweep_timer = 0;
+uint16_t ch4_LFSR = 0;
+uint32_t ch4_LFSR_timer = 0;
 
 static uint32_t buf_readpos = 0;
 static uint32_t buf_writepos = 0;
@@ -117,15 +107,15 @@ void init_audio(void) {
     device_config.pUserData         = &master_waveform;
 
     if (ma_device_init(NULL, &device_config, &device) != MA_SUCCESS) {
-        printf("Failed to open playback device.\n");
+        fprintf(stderr, "Failed to open playback device.\n");
         exit(EXIT_FAILURE);
     }
-    printf("Loaded audio device %s\n", device.playback.name);
+    fprintf(stderr, "Loaded audio device %s\n", device.playback.name);
     master_waveform_config = ma_waveform_config_init(device.playback.format, device.playback.channels, device.sampleRate, ma_waveform_type_square, 0.2, 240);
     ma_waveform_init(&master_waveform_config, &master_waveform);
 
     if (ma_device_start(&device) != MA_SUCCESS) {
-        printf("Failed to start playback device.\n");
+        fprintf(stderr, "Failed to start playback device.\n");
         ma_device_uninit(&device);
         exit(EXIT_FAILURE);
     }
@@ -144,7 +134,7 @@ void close_audio(void) {
 
 static inline void event_length(void) {
     /* process the ticking of the length timer */
-    for (uint8_t i=0; i<2; i++) {
+    for (uint8_t i=0; i<4; i+=i+1) { // sequence 0,1,3 for pulse channels and wave.
         if ((read_byte(REG_NR52)&(1<<i)) && (read_byte(REG_NRx4[i])&0x40)) { // is channel i on and length enabled?
             channels[i].length_timer++;
             if (channels[i].length_timer >= 64) {
@@ -161,7 +151,7 @@ static inline void event_ch1_freq_sweep(void) {
     bool direction = *(ram+REG_NR10)&8;
     uint8_t pace = (*(ram+REG_NR10)>>4)&7;
 
-    uint16_t delta = channels[0].pulse_period / (uint16_t)pow(2, step);
+    uint16_t delta = channels[0].pulse_period >> step;
 
     if (direction && channels[0].pulse_period + delta > 0x7FF) { // pending overflow; immediately disable
         *(ram+REG_NR52) &= ~1; // disable channel 1
@@ -187,7 +177,7 @@ static inline void event_ch1_freq_sweep(void) {
 
 static inline void event_envelope_sweep(void) {
     /* process the ticking of the amplitude envelope */
-    for (uint8_t i=0; i<2; i++) {
+    for (uint8_t i=0; i<4; i+=i+1) { // sequence 0,1,3 for pulse channels and wave.
         if ((read_byte(REG_NR52)&(1<<i)) && (read_byte(REG_NRx2[i])&7)) { // is channel i on and sweep not 0 ?
             channels[i].amp_sweep_timer++;
             if (channels[i].amp_sweep_timer >= channels[i].amp_sweep_attrs&7) { // sweep pace
@@ -203,7 +193,7 @@ static inline void event_envelope_sweep(void) {
 }
 
 
-float high_pass(float value, uint8_t cap_id) {
+static inline float high_pass(float value, uint8_t cap_id) {
     /* simulate the high-pass filter capacitor in the gameboy's audio circuit */
     float out = value - capacitors[cap_id];
     capacitors[cap_id] = value - out * CAPACITANCE;
@@ -262,8 +252,8 @@ static inline void queue_sample(void) {
 }
 
 
-void enable_pulse_channel(bool channel_id) {
-    /* start a pulse channel */
+static void enable_channel(uint8_t channel_id) {
+    /* start a pulse or noise channel */
     if (read_byte(REG_NRx2[channel_id]) & 0xF8) { // only enable channel if DAC is on
         *(ram+REG_NR52) |= (1<<channel_id); // enable channel
         if (channels[channel_id].length_timer >= 64) channels[channel_id].length_timer = read_byte(REG_NRx1[channel_id])&0x63; // reset length timer if expired
@@ -281,11 +271,16 @@ void handle_audio_register(uint16_t addr) {
     switch (addr)
     {
     case REG_NR14: // channel 1
-        enable_pulse_channel(0);
+        enable_channel(0);
         ch1_freq_sweep_timer = (read_byte(REG_NR10)>>4)&7;
         break;
     case REG_NR24: // channel 2
-        enable_pulse_channel(1);
+        enable_channel(1);
+        break;
+    case REG_NR44: // channel 4
+        enable_channel(3);
+        ch4_LFSR = 0;
+        ch4_LFSR_timer = 0;
         break;
     
     default:
@@ -317,17 +312,37 @@ static inline void tick_pulse_channel(bool channel_id) {
 }
 
 
-static inline void tick_channel_3(void) {
+static inline void tick_wave_channel(void) {
     /* process the ticking of channel 3 (wave) */
 }
 
 
-static inline void tick_channel_4(void) {
-    /* process the ticking of channel 4 (noise) */
+static inline void tick_noise_channel(void) {
+    /* process the ticking of channel 4 (noise). This function is called at a rate of 1MHz */
+    if (read_byte(REG_NR52) & 8) { // is channel on?
+        uint32_t tick_timeout = 2 * read_byte(REG_NR43)&7;
+        if (!tick_timeout) tick_timeout = 1; // treat the divider as 0.5 if the register is set to 0
+        tick_timeout <<= (read_byte(REG_NR43)>>4)+4;
+
+        ch4_LFSR_timer++;
+        if (ch4_LFSR_timer >= tick_timeout) { // advance the LFSR
+            ch4_LFSR_timer = 0;
+
+            bool next_bit = (ch4_LFSR&1) == ((ch4_LFSR>>1)&1);
+            ch4_LFSR &= ~(1<<15);
+            ch4_LFSR |= next_bit<<15;
+            if (read_byte(REG_NR43)&8) { // LFSR short mode
+                ch4_LFSR &= ~(1<<7);
+                ch4_LFSR |= next_bit<<7;
+            }
+            ch4_LFSR >>= 1;
+        }
+        channels[3].sample_state = channels[3].amplitude * (ch4_LFSR&1);
+    }
 }
 
 
-inline void tick_audio(void) {
+void tick_audio(void) {
     /* tick every t-cycle and handle timing of all audio events */
     bool div_bit = (system_counter>>12)&1; // bit 4 of div
     if (last_div_bit && !div_bit) {
@@ -340,9 +355,9 @@ inline void tick_audio(void) {
     if (system_counter % 4 == 0) {
         tick_pulse_channel(0);
         tick_pulse_channel(1);
+        tick_noise_channel();
     }
-    // tick_channel_3();
-    // tick_channel_4();
+    tick_wave_channel();
 
 
     // must send 48000 samples every 4194304 ticks (one second)
