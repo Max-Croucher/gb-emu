@@ -43,6 +43,8 @@ ma_waveform master_waveform;
 ma_device device;
 
 uint8_t ch1_freq_sweep_timer = 0;
+uint8_t ch3_buffered_sample = 0;
+uint8_t ch3_wave_ram_index = 0;
 uint16_t ch4_LFSR = 0;
 uint32_t ch4_LFSR_timer = 0;
 
@@ -227,10 +229,10 @@ static inline void queue_sample(void) {
     */
     float samples[DEVICE_CHANNELS] = {0,0};
     bool dac_state[4] = {
-        read_byte(REG_NR12) & 0xF8,
-        read_byte(REG_NR22) & 0xF8,
-        0,//read_byte(REG_NR30) & 128,
-        read_byte(REG_NR42) & 0xF8
+        0,//read_byte(REG_NR12) & 0xF8,
+        0,//read_byte(REG_NR22) & 0xF8,
+        read_byte(REG_NR30) & 128,
+        0 //read_byte(REG_NR42) & 0xF8
     };
     for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) {
         if (dac_state[i]) {
@@ -263,15 +265,23 @@ static inline void queue_sample(void) {
 
 static void enable_channel(uint8_t channel_id) {
     /* start a pulse or noise channel */
-    if ((read_byte(REG_NRx2[channel_id]) & 0xF8) && (*(ram+REG_NRx4[channel_id])&0x80)) { // only enable channel if DAC is on and trigger bit is set
+    if (*(ram+REG_NRx4[channel_id])&0x80) { // require trigger bit is set
         *(ram+REG_NRx4[channel_id]) &= 0x7f; // reset trigger bit
+        if (channel_id == 2) { // wave channel attributes
+            if (!(read_byte(REG_NR30) & 128)) return; // only proceed if DAC is on
+            if (channels[2].length_timer >= 256) channels[2].length_timer = *(ram + REG_NR31); // reset length timer if expired
+            channels[2].amplitude = (*(ram + REG_NR32)>>5)&3;
+        } else { // other channel attributes
+            if (!(*(ram+REG_NRx4[channel_id])&0x80)) return; // only proceed if DAC is on
+            if (channels[channel_id].length_timer >= 64) channels[channel_id].length_timer = *(ram + REG_NRx1[channel_id])&63; // reset length timer if expired
+            channels[channel_id].amplitude = read_byte(REG_NRx2[channel_id]) >> 4; // set sweep amplitude
+            channels[channel_id].amp_sweep_timer = 0; // reset amplitude envelope timer
+            channels[channel_id].amp_sweep_attrs = read_byte(REG_NRx2[channel_id]) & 15; // store amplitude sweep pace and direction
+        }
+        // common attributes
         *(ram+REG_NR52) |= (1<<channel_id); // enable channel
-        if (channels[channel_id].length_timer >= 64) channels[channel_id].length_timer = *(ram + REG_NRx1[channel_id])&63; // reset length timer if expired
         channels[channel_id].pulse_period = *(ram+REG_NRx3[channel_id]) + (((uint16_t)(*(ram+REG_NRx4[channel_id])&7))<<8); // set pulse period
-        channels[channel_id].amplitude = read_byte(REG_NRx2[channel_id]) >> 4; // set sweep amplitude
         channels[channel_id].duty_period = 0; // reset phase of pulse
-        channels[channel_id].amp_sweep_timer = 0; // reset amplitude envelope timer
-        channels[channel_id].amp_sweep_attrs = read_byte(REG_NRx2[channel_id]) & 15; // store amplitude sweep pace and direction
     }
 }
 
@@ -287,16 +297,24 @@ void handle_audio_register(uint16_t addr) {
     case REG_NR24: // channel 2
         enable_channel(1);
         break;
+    case REG_NR34: // channel 3
+        enable_channel(2);
+        ch3_wave_ram_index = 0;
+        printf("Started wave channel with period counter %d and output level %d\n", channels[2].pulse_period, channels[2].amplitude);
+        for (uint8_t i=0; i<16; i++) {
+            printf("%.2x", *(ram + REG_WAVE1 + i));
+        }
+        printf("\n");
+        break;
     case REG_NR44: // channel 4
         enable_channel(3);
         ch4_LFSR = 0;
         ch4_LFSR_timer = 0;
-        // uint32_t tick_timeout = 2 * (read_byte(REG_NR43)&7);
-        // if (!tick_timeout) tick_timeout = 1; // treat the divider as 0.5 if the register is set to 0
-        // tick_timeout <<= (read_byte(REG_NR43)>>4)+1;
-        // printf("\nStarted noise with amplitude %d. direction is %d. pace is %d. tick timeout is %d (%.3fHz)\n", channels[3].amplitude, channels[3].amp_sweep_attrs>>3, channels[3].amp_sweep_attrs&7, tick_timeout, (float)CLK_HZ / tick_timeout);
         break;
-    
+    case REG_NR32: // channel 3 output level
+        channels[2].amplitude = (*(ram + REG_NR32)>>5)&3;
+        printf("Updated wave channel output level to %d\n", channels[2].amplitude);
+        break;
     default:
         break;
     }
@@ -327,7 +345,21 @@ static inline void tick_pulse_channel(bool channel_id) {
 
 
 static inline void tick_wave_channel(void) {
-    /* process the ticking of channel 3 (wave) */
+    /* process the ticking of channel 3 (wave) This function is called at a rate of 2MHz */
+    if (read_byte(REG_NR52) & 4) { // is channel on?
+        channels[2].pulse_period++;
+        if (channels[2].pulse_period >= 0x7FF) { // overflow at 2047
+            channels[2].pulse_period = *(ram+REG_NR33) + (((uint16_t)(*(ram+REG_NR34)&7))<<8); // reset to the channel period
+            ch3_wave_ram_index++;
+            if (ch3_wave_ram_index == 16) ch3_wave_ram_index = 0;
+            ch3_buffered_sample = read_byte(REG_WAVE1 + ch3_wave_ram_index/2) >> (4*(ch3_wave_ram_index+1)%2);
+        }
+        if (channels[2].amplitude) {
+            channels[2].sample_state = ch3_buffered_sample >> (channels[2].amplitude - 1);
+        } else {
+            channels[2].sample_state = 0;
+        }
+    }
 }
 
 
@@ -365,12 +397,12 @@ void tick_audio(void) {
         if (div_apu % 8 == 7) event_envelope_sweep();   // 64 Hz
         div_apu++;
     }
+    if (system_counter % 2 == 0) tick_wave_channel();
     if (system_counter % 4 == 0) {
         tick_pulse_channel(0);
         tick_pulse_channel(1);
         tick_noise_channel();
     }
-    tick_wave_channel();
 
 
     // must send 48000 samples every 4194304 ticks (one second)

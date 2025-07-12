@@ -12,11 +12,11 @@
 
 typedef struct channel_attributes {
     uint8_t sample_state;
-    uint8_t length_timer;
     uint8_t amp_sweep_timer;
     uint8_t amp_sweep_attrs;
     uint8_t amplitude;
     uint8_t duty_period;
+    uint16_t length_timer;
     uint16_t pulse_period;
 
 }channel_attributes;
