@@ -25,10 +25,11 @@
 #define AUDIO_BUF_NUM_SAMPLES   (AUDIO_BUF_NUM_FRAMES * DEVICE_CHANNELS)
 #define ADUIO_SAMPLE_DIVIDER    (CLK_HZ / DEVICE_SAMPLE_RATE)
 
+#define WAV_SAMPLE_RATE         65536
 #define WAV_BITS_PER_SAMPLE     8
 #define WAV_HEADER_SIZE         44
 #define WAV_BYTES_PER_FRAME     ((GAMEBOY_CHANNELS * WAV_BITS_PER_SAMPLE) / 8)
-#define WAV_BYTES_PER_SECOND    (DEVICE_SAMPLE_RATE * WAV_BYTES_PER_FRAME)
+#define WAV_BYTES_PER_SECOND    (WAV_SAMPLE_RATE * WAV_BYTES_PER_FRAME)
 
 
 
@@ -104,7 +105,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 }
 
 
-void open_wav_file(void) {
+static inline void open_wav_file(void) {
     /* open a wav file to export gameboy audio, and write file header. */
     raw_audio_file = fopen("debug_audio.wav", "wb");
     uint8_t header_format[WAV_HEADER_SIZE] = {
@@ -114,14 +115,14 @@ void open_wav_file(void) {
 
                                         // FORMAT chunk
         'f', 'm', 't', 0x20,            // fmt specifier
-        16, 0, 0, 0,                     // Chunk size, 16 bytes (4 bytes little endian)
+        16, 0, 0, 0,                    // Chunk size, 16 bytes (4 bytes little endian)
         1, 0,                           // Audio format (1 is PCM integer, 2 bytes litte endian)
-        (GAMEBOY_CHANNELS>>0)&0xFF,      // Num channels (2 bytes little endian)
+        (GAMEBOY_CHANNELS>>0)&0xFF,     // Num channels (2 bytes little endian)
         (GAMEBOY_CHANNELS>>8)&0xFF,
-        (DEVICE_SAMPLE_RATE>>0)&0xFF,   // Sample Rate (4 bytes little endian)
-        (DEVICE_SAMPLE_RATE>>8)&0xFF,
-        (DEVICE_SAMPLE_RATE>>16)&0xFF,
-        (DEVICE_SAMPLE_RATE>>24)&0xFF,
+        (WAV_SAMPLE_RATE>>0)&0xFF,      // Sample Rate (4 bytes little endian)
+        (WAV_SAMPLE_RATE>>8)&0xFF,
+        (WAV_SAMPLE_RATE>>16)&0xFF,
+        (WAV_SAMPLE_RATE>>24)&0xFF,
         (WAV_BYTES_PER_SECOND>>0)&0xFF, // Bytes per second (4 bytes little endian)
         (WAV_BYTES_PER_SECOND>>8)&0xFF,
         (WAV_BYTES_PER_SECOND>>16)&0xFF,
@@ -136,6 +137,16 @@ void open_wav_file(void) {
         0, 0, 0, 0                      // data block size
     };
     fwrite(header_format, 1, WAV_HEADER_SIZE, raw_audio_file);
+}
+
+
+static inline void wav_write_sample(void) {
+    /* write the gameboy audio channels as 8-bit PCM integers */
+    for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) {
+        uint8_t audio_byte = (channels[i].sample_state * 16) + 8; // scale to [8-248]
+        fwrite(&audio_byte, 1, 1, raw_audio_file);
+    }
+    wav_frames_written++;
 }
 
 
@@ -179,7 +190,7 @@ void close_audio(void) {
 }
 
 
-void close_wav_file(void) {
+static inline void close_wav_file(void) {
     /* close a wav file and write file length */
     
     uint32_t data_size = htole32(wav_frames_written * WAV_BYTES_PER_FRAME);
@@ -241,10 +252,8 @@ static inline void event_envelope_sweep(void) {
     for (uint8_t i=0; i<4; i+=i+1) { // sequence 0,1,3 for pulse channels and wave.
         if ((read_byte(REG_NR52)&(1<<i)) && (channels[i].amp_sweep_attrs&7)) { // is channel i on and sweep not 0 ?
             channels[i].amp_sweep_timer++;
-            //if (i==3) printf("-");
             if (channels[i].amp_sweep_timer >= (channels[i].amp_sweep_attrs&7)) { // sweep pace
                 channels[i].amp_sweep_timer = 0;
-                //if (i==3) printf("\nAmplitude is %d\n", channels[i].amplitude);
                 if (channels[i].amp_sweep_attrs&8) { // env dir
                     if (channels[i].amplitude != 15) channels[i].amplitude++;
                 } else {
@@ -296,12 +305,7 @@ static inline void queue_sample(void) {
         } else {
             curr_sample = 0;
         }
-        if (do_export_wav) {
-            uint8_t audio_byte = ((curr_sample+0.25) * 480) + 8; // scale to [8-248]
-            fwrite(&audio_byte, 1, 1, raw_audio_file);
-        }
     }
-    if (do_export_wav) wav_frames_written++;
 
     // at this point, each device channel's sample is in the range [-1,1]
 
@@ -450,6 +454,8 @@ void tick_audio(void) {
         tick_pulse_channel(1);
         tick_noise_channel();
     }
+
+    if (do_export_wav && !(system_counter % WAV_SAMPLE_RATE)) wav_write_sample();
 
     gb_sample_index++;
     if (gb_sample_index >= audio_sample_divider) { // send samples every 4MHz / 48000Hz samples
