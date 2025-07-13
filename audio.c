@@ -142,10 +142,12 @@ static inline void open_wav_file(void) {
 
 static inline void wav_write_sample(void) {
     /* write the gameboy audio channels as 8-bit PCM integers */
-    for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) {
-        uint8_t audio_byte = (channels[i].sample_state * 16) + 8; // scale to [8-248]
-        fwrite(&audio_byte, 1, 1, raw_audio_file);
-    }
+    uint8_t audio_byte[4];
+    audio_byte[0] = 128 + (channels[0].sample_state * 8); // scale to [128-248]
+    audio_byte[1] = 128 - (channels[1].sample_state * 8); // scale to [8-128]
+    audio_byte[2] = 128 + (channels[2].sample_state * 8); // scale to [128-248]
+    audio_byte[3] = 128 - (channels[3].sample_state * 8); // scale to [8-128]
+    fwrite(&audio_byte, 1, 4, raw_audio_file);
     wav_frames_written++;
 }
 
@@ -214,6 +216,12 @@ static inline void event_length(void) {
             }
         }
     }
+    if ((read_byte(REG_NR52)&(1<<2)) && (read_byte(REG_NRx4[2])&0x40)) { // is channel 2 on and length enabled?
+        channels[2].length_timer++;
+        if (channels[2].length_timer >= 256) {
+            *(ram+REG_NR52) &= ~(1<<2); // disable channel 2
+        }
+    }
 }
 
 
@@ -225,7 +233,7 @@ static inline void event_ch1_freq_sweep(void) {
 
     uint16_t delta = channels[0].pulse_period >> step;
 
-    if (direction && channels[0].pulse_period + delta > 0x7FF) { // pending overflow; immediately disable
+    if ((!direction) && channels[0].pulse_period + delta > 0x7FF) { // pending overflow; immediately disable
         *(ram+REG_NR52) &= ~1; // disable channel 1
         return;
     }
@@ -235,9 +243,9 @@ static inline void event_ch1_freq_sweep(void) {
         ch1_freq_sweep_timer--;
         if (ch1_freq_sweep_timer == 0) { // change freq
             if (direction) {
-                channels[0].pulse_period += delta;
-            } else {
                 channels[0].pulse_period -= delta;
+            } else {
+                channels[0].pulse_period += delta;
             }
             *(ram+REG_NR13) = channels[0].pulse_period & 0xFF;
             *(ram+REG_NR13) &= 0xF8;
@@ -302,21 +310,14 @@ static inline void queue_sample(void) {
             curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
             if (read_byte(REG_NR51) & 1 << i    ) samples[0] += curr_sample; // right
             if (read_byte(REG_NR51) & 1 << (i+4)) samples[1] += curr_sample; // left
-        } else {
-            curr_sample = 0;
         }
     }
 
     // at this point, each device channel's sample is in the range [-1,1]
 
     for (uint8_t i=0; i<DEVICE_CHANNELS; i++) {
-        if (read_byte(REG_NR50) & (1 << (3 + (4*i)))){ // is master channel on
-            samples[i] = 0;
-
-        } else {
-            samples[i] *= (float)(((read_byte(REG_NR50) >> (4*i)) & 7) + 1) / 8.0; // scale by master volume
-            samples[i] = high_pass(samples[i], i);
-        }
+        samples[i] *= (float)(((read_byte(REG_NR50) >> (4*i)) & 7) + 1) / 8.0; // scale by master volume
+        samples[i] = high_pass(samples[i], i);
         write_to_buf(samples[i]);
 
     }
@@ -385,7 +386,7 @@ static inline void tick_pulse_channel(bool channel_id) {
 
             uint8_t duty_limit = (read_byte(REG_NRx1[channel_id])>>6) * 2;
             if (!duty_limit) duty_limit++;
-            if ((channels[channel_id].duty_period%8) < duty_limit) { // sample is low
+            if ((channels[channel_id].duty_period&7) < duty_limit) { // sample is low
                 channels[channel_id].sample_state = 0;
             } else { // sample is high
                 channels[channel_id].sample_state = channels[channel_id].amplitude;
