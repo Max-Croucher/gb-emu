@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <endian.h>
 #include "miniaudio.h"
 #include "miniaudio.c"
 #include "cpu.h"
@@ -24,13 +25,22 @@
 #define AUDIO_BUF_NUM_SAMPLES   (AUDIO_BUF_NUM_FRAMES * DEVICE_CHANNELS)
 #define ADUIO_SAMPLE_DIVIDER    (CLK_HZ / DEVICE_SAMPLE_RATE)
 
+#define WAV_BITS_PER_SAMPLE     8
+#define WAV_HEADER_SIZE         44
+#define WAV_BYTES_PER_FRAME     ((GAMEBOY_CHANNELS * WAV_BITS_PER_SAMPLE) / 8)
+#define WAV_BYTES_PER_SECOND    (DEVICE_SAMPLE_RATE * WAV_BYTES_PER_FRAME)
+
+
+
 extern uint8_t* ram;
 extern uint16_t system_counter;
 static uint8_t div_apu = 1;
 static bool last_div_bit = 0;
 static uint16_t gb_sample_index = 0;
 static double capacitors[DEVICE_CHANNELS] = {0.0};
-static uint16_t audio_sample_divider = ADUIO_SAMPLE_DIVIDER;
+static uint16_t audio_sample_divider = ADUIO_SAMPLE_DIVIDER + 1;
+bool do_export_wav = 0; //extern
+static uint64_t wav_frames_written = 0;
 
 static uint16_t REG_NRx1[4] = {REG_NR11,REG_NR21,REG_NR31,REG_NR41};
 static uint16_t REG_NRx2[4] = {REG_NR12,REG_NR22,REG_NR32,REG_NR42};
@@ -80,17 +90,52 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     }
 
     if (buf_readpos + frameCount * DEVICE_CHANNELS < AUDIO_BUF_NUM_SAMPLES) { // buf does not wrap around. do one memcpy
-        fwrite(&audio_buffer[buf_readpos], sizeof(float), frameCount * DEVICE_CHANNELS, raw_audio_file);
+        // fwrite(&audio_buffer[buf_readpos], sizeof(float), frameCount * DEVICE_CHANNELS, raw_audio_file);
         memcpy(pFramesOutF32, &audio_buffer[buf_readpos], sizeof(float) * frameCount * DEVICE_CHANNELS);
         buf_readpos += frameCount * DEVICE_CHANNELS;
     } else { // buf wraps around. Do two memcpys
-        fwrite(&audio_buffer[buf_readpos], sizeof(float), AUDIO_BUF_NUM_SAMPLES-buf_readpos, raw_audio_file);
+        // fwrite(&audio_buffer[buf_readpos], sizeof(float), AUDIO_BUF_NUM_SAMPLES-buf_readpos, raw_audio_file);
         memcpy(pFramesOutF32, &audio_buffer[buf_readpos], sizeof(float) * (AUDIO_BUF_NUM_SAMPLES-buf_readpos));
         uint32_t new_readpos = (frameCount * DEVICE_CHANNELS - (AUDIO_BUF_NUM_SAMPLES-buf_readpos));
-        fwrite(audio_buffer, sizeof(float), new_readpos, raw_audio_file);
+        // fwrite(audio_buffer, sizeof(float), new_readpos, raw_audio_file);
         memcpy(&pFramesOutF32[AUDIO_BUF_NUM_SAMPLES-buf_readpos], audio_buffer, sizeof(float) * new_readpos);
         buf_readpos = new_readpos;
     }
+}
+
+
+void open_wav_file(void) {
+    /* open a wav file to export gameboy audio, and write file header. */
+    raw_audio_file = fopen("debug_audio.wav", "wb");
+    uint8_t header_format[WAV_HEADER_SIZE] = {
+        'R', 'I', 'F', 'F',             // Identifier
+        0, 0, 0, 0,                     // File size (minus 8 bytes)
+        'W', 'A', 'V', 'E',             // File format
+
+                                        // FORMAT chunk
+        'f', 'm', 't', 0x20,            // fmt specifier
+        16, 0, 0, 0,                     // Chunk size, 16 bytes (4 bytes little endian)
+        1, 0,                           // Audio format (1 is PCM integer, 2 bytes litte endian)
+        (GAMEBOY_CHANNELS>>0)&0xFF,      // Num channels (2 bytes little endian)
+        (GAMEBOY_CHANNELS>>8)&0xFF,
+        (DEVICE_SAMPLE_RATE>>0)&0xFF,   // Sample Rate (4 bytes little endian)
+        (DEVICE_SAMPLE_RATE>>8)&0xFF,
+        (DEVICE_SAMPLE_RATE>>16)&0xFF,
+        (DEVICE_SAMPLE_RATE>>24)&0xFF,
+        (WAV_BYTES_PER_SECOND>>0)&0xFF, // Bytes per second (4 bytes little endian)
+        (WAV_BYTES_PER_SECOND>>8)&0xFF,
+        (WAV_BYTES_PER_SECOND>>16)&0xFF,
+        (WAV_BYTES_PER_SECOND>>24)&0xFF,
+        (WAV_BYTES_PER_FRAME>>0)&0xFF,  // Bytes per frame (2 bytes little endian)
+        (WAV_BYTES_PER_FRAME>>8)&0xFF,
+        (WAV_BITS_PER_SAMPLE>>0)&0xFF,  // Bits per sample (2 bytes little endian)
+        (WAV_BITS_PER_SAMPLE>>8)&0xFF,
+
+                                        // DATA chunk
+        'd', 'a', 't', 'a',             // data specifier
+        0, 0, 0, 0                      // data block size
+    };
+    fwrite(header_format, 1, WAV_HEADER_SIZE, raw_audio_file);
 }
 
 
@@ -98,8 +143,6 @@ void init_audio(void) {
     /* initialise the audio controller */
     ma_device_config device_config;
     ma_waveform_config master_waveform_config;
-
-    raw_audio_file = fopen("raw_audio.waveform", "wb");
 
     device_config = ma_device_config_init(ma_device_type_playback);
     device_config.playback.format   = DEVICE_FORMAT;
@@ -124,6 +167,7 @@ void init_audio(void) {
 
     memset(channels, 0, sizeof(channel_attributes) * GAMEBOY_CHANNELS); // init channels attrs to 0
 
+    if (do_export_wav) open_wav_file();
 }
 
 
@@ -131,6 +175,21 @@ void close_audio(void) {
     /* close the audio devices */
     ma_device_uninit(&device);
     ma_waveform_uninit(&master_waveform);  /* Uninitialize the waveform after the device so we don't pull it from under the device while it's being reference in the data callback. */
+    if (do_export_wav) close_wav_file();
+}
+
+
+void close_wav_file(void) {
+    /* close a wav file and write file length */
+    
+    uint32_t data_size = htole32(wav_frames_written * WAV_BYTES_PER_FRAME);
+    uint32_t file_size = htole32(WAV_HEADER_SIZE - 8 + data_size);
+    fseek(raw_audio_file, 4, SEEK_SET);
+    fwrite(&file_size, sizeof(uint32_t), 1, raw_audio_file);
+    fseek(raw_audio_file, 40, SEEK_SET);
+    fwrite(&data_size, sizeof(uint32_t), 1, raw_audio_file);
+    fclose(raw_audio_file);
+    printf("Written %ld frames to WAV file\n", wav_frames_written);
 }
 
 
@@ -228,18 +287,22 @@ static inline void queue_sample(void) {
         read_byte(REG_NR30) & 128,
         read_byte(REG_NR42) & 0xF8
     };
-    //printf("(%d%d%d%d) ", dac_state[0], dac_state[1], dac_state[2], dac_state[3]);
+    float curr_sample;
     for (uint8_t i=0; i<GAMEBOY_CHANNELS; i++) {
         if (dac_state[i]) {
-            //printf("%2d ", channels[i].sample_state);
-            float curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
+            curr_sample = ((float)channels[i].sample_state / 30.0) - 0.25; // scale to [-0.25, 0.25]
             if (read_byte(REG_NR51) & 1 << i    ) samples[0] += curr_sample; // right
             if (read_byte(REG_NR51) & 1 << (i+4)) samples[1] += curr_sample; // left
         } else {
-            //printf("-- ");
+            curr_sample = 0;
+        }
+        if (do_export_wav) {
+            uint8_t audio_byte = ((curr_sample+0.25) * 480) + 8; // scale to [8-248]
+            fwrite(&audio_byte, 1, 1, raw_audio_file);
         }
     }
-    //printf("\n");
+    if (do_export_wav) wav_frames_written++;
+
     // at this point, each device channel's sample is in the range [-1,1]
 
     for (uint8_t i=0; i<DEVICE_CHANNELS; i++) {
@@ -255,21 +318,6 @@ static inline void queue_sample(void) {
     }
     frames_written++;
 }
-
-
-// static void enable_channel(uint8_t channel_id) {
-//     /* start a pulse or noise channel */
-//     if ((read_byte(REG_NRx2[channel_id]) & 0xF8) && (*(ram+REG_NRx4[channel_id])&0x80)) { // only enable channel if DAC is on and trigger bit is set
-//         *(ram+REG_NRx4[channel_id]) &= 0x7f; // reset trigger bit
-//         *(ram+REG_NR52) |= (1<<channel_id); // enable channel
-//         if (channels[channel_id].length_timer >= 64) channels[channel_id].length_timer = *(ram + REG_NRx1[channel_id])&63; // reset length timer if expired
-//         channels[channel_id].pulse_period = *(ram+REG_NRx3[channel_id]) + (((uint16_t)(*(ram+REG_NRx4[channel_id])&7))<<8); // set pulse period
-//         channels[channel_id].amplitude = read_byte(REG_NRx2[channel_id]) >> 4; // set sweep amplitude
-//         channels[channel_id].duty_period = 0; // reset phase of pulse
-//         channels[channel_id].amp_sweep_timer = 0; // reset amplitude envelope timer
-//         channels[channel_id].amp_sweep_attrs = read_byte(REG_NRx2[channel_id]) & 15; // store amplitude sweep pace and direction
-//     }
-// }
 
 
 static void enable_channel(uint8_t channel_id) {

@@ -23,7 +23,9 @@ typedef struct channel_attributes {
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 void init_audio(void);
+void open_wav_file(void);
 void close_audio(void);
+void close_wav_file(void);
 static inline void event_length(void);
 static inline void event_ch1_freq_sweep(void);
 static inline void event_envelope_sweep(void);

@@ -429,10 +429,7 @@ void key_pressed(unsigned char key, int x, int y) {
     default:
         has_changed = 0;
     }
-    if (has_changed) {
-        if (key != 27) fprintf(stderr, "Key Pressed (%c)\n", key);
-        joypad_io();
-    }
+    if (has_changed) joypad_io();
 }
 
 

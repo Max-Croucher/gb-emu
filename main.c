@@ -64,6 +64,7 @@ extern uint8_t do_haltmode;
 extern void (*scheduled_instructions[10])(void);
 extern uint8_t num_scheduled_instructions;
 extern uint8_t current_instruction_count;
+extern bool do_export_wav;
 
 
 void decode_launch_args(int argc, char *argv[]) {
@@ -79,6 +80,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--green")) dmg_colours = 1;
         if (!strcmp(argv[i], "--frame-by-frame")) frame_by_frame = 1;
         if (!strcmp(argv[i], "--no-audio")) no_audio = 1;
+        if (!strcmp(argv[i], "--export-wav")) do_export_wav = 1;
     }
 }
 

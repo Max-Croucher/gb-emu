@@ -40,3 +40,4 @@ This project is for my own learning and experience, and is therefore written wit
  - `--scanline` will also open the second window, but will update the window every scanline. Waits for newlines in STDIN to draw the next scanline.
  - `--green` will swap the screen's palette for the original gameboy's universally loved puke green colours.
  - `--no-audio` will completely disable the audio engine.
+ - `--export-wav` will enable the output of the gameboy's four audio channels to a 4-channel wav file
