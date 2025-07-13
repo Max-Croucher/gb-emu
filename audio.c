@@ -455,7 +455,7 @@ void tick_audio(void) {
         tick_noise_channel();
     }
 
-    if (do_export_wav && !(system_counter % WAV_SAMPLE_RATE)) wav_write_sample();
+    if (do_export_wav && !(system_counter % (CLK_HZ / WAV_SAMPLE_RATE))) wav_write_sample();
 
     gb_sample_index++;
     if (gb_sample_index >= audio_sample_divider) { // send samples every 4MHz / 48000Hz samples
