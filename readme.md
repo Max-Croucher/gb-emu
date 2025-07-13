@@ -2,12 +2,13 @@
 This project is for my own learning and experience, and is therefore written without any use of AI. Written for Linux, and completely untested on Windows or devices with a different byte order. This project is very much a work-in-progress.
 
 ## Things that work:
- - Some games, including Tetris and Dr Mario
+ - Many games, including Tetris, Kirby and Link's Awakening
  - Intructions are implemented for machine cycle accuracy
  - Blargg CPU instruction tests
  - Common MBANK controllers (MBC1, MBC2, MBC5)
  - Interrupts and timers
  - Graphics, including the Acid2 test
+ - Sound, although sometimes the noise channel sounds wrong.
  - Framerate limiting to 59.7Hz
  - Tilemap viewer and debugger
 
@@ -22,7 +23,6 @@ This project is for my own learning and experience, and is therefore written wit
  - Implement the ability to save games and create/use save states
 
 ## Lofty Goals:
- - Sound
  - GBC support
  - Serial I/O
  - Do some serious optimisation to achieve >500 FPS
@@ -33,7 +33,7 @@ This project is for my own learning and experience, and is therefore written wit
  The following command line arguments are also available:
  - `--halt-on-breakpoint` will cause the emulator to stop when the instruction `LD B B` is encountered and print the contents of the CPU's registers.
  - `--halt-on-breakpoint` will cause the emulator to print the contents of the CPU's registers when the instruction `LD B B` is encountered, but not stop.
- - `--max-speed` removes the 59.7Hz limit,, allowing the emulator to run as fast as it can.
+ - `--max-speed` removes the 59.7Hz limit, allowing the emulator to run as fast as it can.
  - `--windowless` will stop OpenGL from initialising, and stops the PPU from ticking. Useful for automating tests that don't need graphics.
  - `--debug` will cause the emulator to write a detailed log of the CPU state before every instruction is executed.
  - `--tilemap` will open a second window that displays the contents of VRAM, tilemaps and OAM. This window is updated every frame.

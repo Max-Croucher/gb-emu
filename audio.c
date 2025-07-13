@@ -202,7 +202,7 @@ static inline void close_wav_file(void) {
     fseek(raw_audio_file, 40, SEEK_SET);
     fwrite(&data_size, sizeof(uint32_t), 1, raw_audio_file);
     fclose(raw_audio_file);
-    printf("Written %ld frames to WAV file\n", wav_frames_written);
+    fprintf(stderr, "Written %ld frames to WAV file\n", wav_frames_written);
 }
 
 
@@ -227,29 +227,35 @@ static inline void event_length(void) {
 
 static inline void event_ch1_freq_sweep(void) {
     /* process the ticking of channel 1's frequency sweep */
-    uint8_t step = *(ram+REG_NR10)&7;
-    bool direction = *(ram+REG_NR10)&8;
-    uint8_t pace = (*(ram+REG_NR10)>>4)&7;
+    if (read_byte(REG_NR52)&1) { // is channel on?
+        uint8_t step = *(ram+REG_NR10)&7;
+        bool direction = *(ram+REG_NR10)&8;
+        uint8_t pace = (*(ram+REG_NR10)>>4)&7;
 
-    uint16_t delta = channels[0].pulse_period >> step;
+        uint16_t delta = channels[0].pulse_period >> step;
 
-    if ((!direction) && channels[0].pulse_period + delta > 0x7FF) { // pending overflow; immediately disable
-        *(ram+REG_NR52) &= ~1; // disable channel 1
-        return;
-    }
 
-    // otherwise, proceed as normal
-    if ((read_byte(REG_NR10)>>4)&7) { // only tick if pace is not 0
-        ch1_freq_sweep_timer--;
-        if (ch1_freq_sweep_timer == 0) { // change freq
+        if (ch1_freq_sweep_timer) {
+            ch1_freq_sweep_timer--;
+        } else { // timer hit 0, reset
+            ch1_freq_sweep_timer = pace;
+            uint16_t new_period;
             if (direction) {
-                channels[0].pulse_period -= delta;
+                new_period -= delta;
             } else {
-                channels[0].pulse_period += delta;
+                new_period += delta;
             }
-            *(ram+REG_NR13) = channels[0].pulse_period & 0xFF;
-            *(ram+REG_NR13) &= 0xF8;
-            *(ram+REG_NR13) |= channels[0].pulse_period>>8;
+
+            if ((!direction) && new_period > 0x7FF) { // pending overflow; immediately disable
+                *(ram+REG_NR52) &= ~1; // disable channel 1
+                return;
+            }
+
+            if (pace) {
+                *(ram+REG_NR13) = channels[0].pulse_period & 0xFF;
+                *(ram+REG_NR13) &= 0xF8;
+                *(ram+REG_NR13) |= channels[0].pulse_period>>8;
+            }
         }
     }
 }
@@ -370,6 +376,8 @@ void handle_audio_register(uint16_t addr) {
         break;
     case REG_NR32: // channel 3 output level
         channels[2].amplitude = (*(ram + REG_NR32)>>5)&3;
+        break;
+    case REG_NR52:
         break;
     default:
         break;
