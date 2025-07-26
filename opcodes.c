@@ -33,79 +33,6 @@ static bool working_bit = 0; // internal bit. Typically a carry bit or a cc cond
 static bool do_zflag = 0; // internal bit. Controls difference in flag behaviour for instructions like RLCA and RLC
 
 
-static void (*instructions[256])(void) = {
-/*  0x00                    0x01                    0x02                    0x03                    0x04                    0x05                    0x06                    0x07                    0x08                    0x09                    0x0A                    0x0B                    0x0C                    0x0D                    0x0E                    0x0F*/
-    &instr_nop,             &instr_ld_r16_imm16,    &instr_ld_r16_A,        &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rlca,            &instr_ld_imm16_sp,     &instr_add_hl_r16,      &instr_ld_A_r16,        &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rrca,        //0x00
-    &instr_stop,            &instr_ld_r16_imm16,    &instr_ld_r16_A,        &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rla,             &instr_jr_imm8,         &instr_add_hl_r16,      &instr_ld_A_r16,        &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rra,         //0x10
-    &instr_jr_cc_imm8,      &instr_ld_r16_imm16,    &instr_ld_hl_a_plus,    &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_daa,             &instr_jr_cc_imm8,      &instr_add_hl_r16,      &instr_ld_a_hl_plus,    &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_cpl,         //0x20
-    &instr_jr_cc_imm8,      &instr_ld_r16_imm16,    &instr_ld_hl_a_minus,   &instr_inc_r16,         &instr_inc_hl,          &instr_dec_hl,          &instr_ld_hl_imm8,      &instr_scf,             &instr_jr_cc_imm8,      &instr_add_hl_r16,      &instr_ld_a_hl_minus,   &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_ccf,         //0x30
-    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x40
-    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x50
-    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x60
-    &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_halt,            &instr_ld_hl_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x70
-    &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_hl,        &instr_add_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_hl,        &instr_adc_a_r8,    //0x80
-    &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_hl,        &instr_sub_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_hl,        &instr_sbc_a_r8,    //0x90
-    &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_hl,        &instr_and_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_hl,        &instr_xor_a_r8,    //0xA0
-    &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_hl,         &instr_or_a_r8,         &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_hl,        &instr_cmp_a_r8,    //0xB0
-    &instr_ret_cc,          &instr_pop_r16,         &instr_jp_cc_imm16,     &instr_jp_imm16,        &instr_call_cc_imm16,   &instr_push_r16,        &instr_add_a_imm8,      &instr_rst,             &instr_ret_cc,          &instr_ret,             &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_call_imm16,      &instr_adc_a_imm8,      &instr_rst,         //0xC0
-    &instr_ret_cc,          &instr_pop_r16,         &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_push_r16,        &instr_sub_a_imm8,      &instr_rst,             &instr_ret_cc,          &instr_reti,            &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_invalid,         &instr_sbc_a_imm8,      &instr_rst,         //0xD0
-    &instr_ldh_imm8_a,      &instr_pop_r16,         &instr_ldh_c_a,         &instr_invalid,         &instr_invalid,         &instr_push_r16,        &instr_and_a_imm8,      &instr_rst,             &instr_add_sp_r8,       &instr_jp_hl,           &instr_ld_imm16_a,      &instr_invalid,         &instr_invalid,         &instr_invalid,         &instr_xor_a_imm8,      &instr_rst,         //0xE0
-    &instr_ldh_a_imm8,      &instr_pop_r16,         &instr_ldh_a_c,         &instr_di,              &instr_invalid,         &instr_push_r16,        &instr_or_a_imm8,       &instr_rst,             &instr_ld_hl_sp_e,      &instr_ld_sp_hl,        &instr_ld_a_imm16,      &instr_ei,              &instr_invalid,         &instr_invalid,         &instr_cmp_a_imm8,      &instr_rst          //0xF0
-};
-
-
-static void (*prefixed_instructions[256])(void) = {
-/*  0x00                    0x01                    0x02                    0x03                    0x04                    0x05                    0x06                    0x07                    0x08                    0x09                    0x0A                    0x0B                    0x0C                    0x0D                    0x0E                    0x0F*/
-    &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_hl,          &instr_rlc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_hl,          &instr_rrc_r8,      //0x00
-    &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_hl,           &instr_rl_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_hl,           &instr_rr_r8,       //0x10
-    &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_hl,          &instr_sla_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_hl,          &instr_sra_r8,      //0x20
-    &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_hl,         &instr_swap_r8,         &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_hl,          &instr_srl_r8,      //0x30
-    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x40
-    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x50
-    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x60
-    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x70
-    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0x80
-    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0x90
-    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0xA0
-    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0xB0
-    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xC0
-    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xD0
-    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xE0
-    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8       //0xF0
-};
-
-
-void queue_instruction(void) {
-    /* read the opcode at the PC and queue an instruction's atomic instructions */
-    uint8_t opcode = read_byte(get_r16(R16PC));
-
-    if (opcode == 0xCB) {
-        (prefixed_instructions[read_byte(get_r16(R16PC)+1)])();
-    } else {
-        (instructions[opcode])();
-    }
-    current_instruction_count = 0;
-}
-
-
-void load_interrupt_instructions(uint8_t isr) {
-    /* load the atomic instructions that execute during interrupt handling */
-    r16 = R16PC;
-    addr = 0x40+(isr<<3);
-    scheduled_instructions[0] = &machine_idle;
-    scheduled_instructions[1] = &machine_dec_sp;
-    scheduled_instructions[2] = &machine_interrupt_push_r16_high_dec_sp;
-    scheduled_instructions[3] = &machine_push_r16_low;
-    scheduled_instructions[4] = &machine_set_pc_addr;
-    num_scheduled_instructions = 5;
-    current_instruction_count = 0;
-    // set_ime(0); //disable isr flag
-    // reg.SP-=2; //execute a CALL (push PC to stack)
-    // write_word(reg.SP, reg.PC);
-    // set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
-}
-
-
 static void machine_nop(void) {
     /* do nothing but increment PC */
     reg.PC++;
@@ -153,12 +80,6 @@ static void machine_load_r8_Z(void) {
     /* load into register r8 from Z */
     set_r8(r8, Z);
     reg.PC++;
-}
-
-
-static void machine_load_Z_r8(void) {
-    /* load into Z from register r8 */
-    Z = get_r8(r8);
 }
 
 
@@ -231,13 +152,6 @@ static void machine_load_addr_r8(void) {
 static void machine_load_Z_addr(void) {
     /* load into Z from addr */
     Z = read_byte(addr);
-}
-
-
-static void machine_load_addr_Z(void) {
-    /* load into addr from Z */
-    write_byte(addr, Z);
-    reg.PC++;
 }
 
 
@@ -1847,4 +1761,76 @@ static void instr_halt(void) {
     /* enter HALT mode */
     scheduled_instructions[0] = &machine_halt;
     num_scheduled_instructions = 1;
+}
+
+static void (*instructions[256])(void) = {
+/*  0x00                    0x01                    0x02                    0x03                    0x04                    0x05                    0x06                    0x07                    0x08                    0x09                    0x0A                    0x0B                    0x0C                    0x0D                    0x0E                    0x0F*/
+    &instr_nop,             &instr_ld_r16_imm16,    &instr_ld_r16_A,        &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rlca,            &instr_ld_imm16_sp,     &instr_add_hl_r16,      &instr_ld_A_r16,        &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rrca,        //0x00
+    &instr_stop,            &instr_ld_r16_imm16,    &instr_ld_r16_A,        &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rla,             &instr_jr_imm8,         &instr_add_hl_r16,      &instr_ld_A_r16,        &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_rra,         //0x10
+    &instr_jr_cc_imm8,      &instr_ld_r16_imm16,    &instr_ld_hl_a_plus,    &instr_inc_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_daa,             &instr_jr_cc_imm8,      &instr_add_hl_r16,      &instr_ld_a_hl_plus,    &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_cpl,         //0x20
+    &instr_jr_cc_imm8,      &instr_ld_r16_imm16,    &instr_ld_hl_a_minus,   &instr_inc_r16,         &instr_inc_hl,          &instr_dec_hl,          &instr_ld_hl_imm8,      &instr_scf,             &instr_jr_cc_imm8,      &instr_add_hl_r16,      &instr_ld_a_hl_minus,   &instr_dec_r16,         &instr_inc_r8,          &instr_dec_r8,          &instr_ld_r8_imm8,      &instr_ccf,         //0x30
+    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x40
+    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x50
+    &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x60
+    &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_ld_hl_r8,        &instr_halt,            &instr_ld_hl_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_r8,        &instr_ld_r8_hl,        &instr_ld_r8_r8,    //0x70
+    &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_r8,        &instr_add_a_hl,        &instr_add_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_r8,        &instr_adc_a_hl,        &instr_adc_a_r8,    //0x80
+    &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_r8,        &instr_sub_a_hl,        &instr_sub_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_r8,        &instr_sbc_a_hl,        &instr_sbc_a_r8,    //0x90
+    &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_r8,        &instr_and_a_hl,        &instr_and_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_r8,        &instr_xor_a_hl,        &instr_xor_a_r8,    //0xA0
+    &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_r8,         &instr_or_a_hl,         &instr_or_a_r8,         &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_r8,        &instr_cmp_a_hl,        &instr_cmp_a_r8,    //0xB0
+    &instr_ret_cc,          &instr_pop_r16,         &instr_jp_cc_imm16,     &instr_jp_imm16,        &instr_call_cc_imm16,   &instr_push_r16,        &instr_add_a_imm8,      &instr_rst,             &instr_ret_cc,          &instr_ret,             &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_call_imm16,      &instr_adc_a_imm8,      &instr_rst,         //0xC0
+    &instr_ret_cc,          &instr_pop_r16,         &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_push_r16,        &instr_sub_a_imm8,      &instr_rst,             &instr_ret_cc,          &instr_reti,            &instr_jp_cc_imm16,     &instr_invalid,         &instr_call_cc_imm16,   &instr_invalid,         &instr_sbc_a_imm8,      &instr_rst,         //0xD0
+    &instr_ldh_imm8_a,      &instr_pop_r16,         &instr_ldh_c_a,         &instr_invalid,         &instr_invalid,         &instr_push_r16,        &instr_and_a_imm8,      &instr_rst,             &instr_add_sp_r8,       &instr_jp_hl,           &instr_ld_imm16_a,      &instr_invalid,         &instr_invalid,         &instr_invalid,         &instr_xor_a_imm8,      &instr_rst,         //0xE0
+    &instr_ldh_a_imm8,      &instr_pop_r16,         &instr_ldh_a_c,         &instr_di,              &instr_invalid,         &instr_push_r16,        &instr_or_a_imm8,       &instr_rst,             &instr_ld_hl_sp_e,      &instr_ld_sp_hl,        &instr_ld_a_imm16,      &instr_ei,              &instr_invalid,         &instr_invalid,         &instr_cmp_a_imm8,      &instr_rst          //0xF0
+};
+
+
+static void (*prefixed_instructions[256])(void) = {
+/*  0x00                    0x01                    0x02                    0x03                    0x04                    0x05                    0x06                    0x07                    0x08                    0x09                    0x0A                    0x0B                    0x0C                    0x0D                    0x0E                    0x0F*/
+    &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_r8,          &instr_rlc_hl,          &instr_rlc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_r8,          &instr_rrc_hl,          &instr_rrc_r8,      //0x00
+    &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_r8,           &instr_rl_hl,           &instr_rl_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_r8,           &instr_rr_hl,           &instr_rr_r8,       //0x10
+    &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_r8,          &instr_sla_hl,          &instr_sla_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_r8,          &instr_sra_hl,          &instr_sra_r8,      //0x20
+    &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_r8,         &instr_swap_hl,         &instr_swap_r8,         &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_r8,          &instr_srl_hl,          &instr_srl_r8,      //0x30
+    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x40
+    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x50
+    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x60
+    &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_r8,          &instr_bit_hl,          &instr_bit_r8,      //0x70
+    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0x80
+    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0x90
+    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0xA0
+    &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_r8,          &instr_res_hl,          &instr_res_r8,      //0xB0
+    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xC0
+    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xD0
+    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,      //0xE0
+    &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_r8,          &instr_set_hl,          &instr_set_r8       //0xF0
+};
+
+
+void queue_instruction(void) {
+    /* read the opcode at the PC and queue an instruction's atomic instructions */
+    uint8_t opcode = read_byte(get_r16(R16PC));
+
+    if (opcode == 0xCB) {
+        (prefixed_instructions[read_byte(get_r16(R16PC)+1)])();
+    } else {
+        (instructions[opcode])();
+    }
+    current_instruction_count = 0;
+}
+
+
+void load_interrupt_instructions(uint8_t isr) {
+    /* load the atomic instructions that execute during interrupt handling */
+    r16 = R16PC;
+    addr = 0x40+(isr<<3);
+    scheduled_instructions[0] = &machine_idle;
+    scheduled_instructions[1] = &machine_dec_sp;
+    scheduled_instructions[2] = &machine_interrupt_push_r16_high_dec_sp;
+    scheduled_instructions[3] = &machine_push_r16_low;
+    scheduled_instructions[4] = &machine_set_pc_addr;
+    num_scheduled_instructions = 5;
+    current_instruction_count = 0;
+    // set_ime(0); //disable isr flag
+    // reg.SP-=2; //execute a CALL (push PC to stack)
+    // write_word(reg.SP, reg.PC);
+    // set_r16(R16PC, 0x40+(isr<<3)); // go to corresponding isr add
 }

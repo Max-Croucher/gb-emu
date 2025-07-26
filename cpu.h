@@ -139,7 +139,7 @@ void write_byte(uint16_t addr, uint8_t byte);
 uint8_t read_byte(uint16_t addr);
 void write_word(uint16_t addr, uint16_t word);
 uint16_t read_word(uint16_t addr);
-uint8_t read_dma(void);
+void read_dma(void);
 void joypad_io(void);
 
 #endif // CPU_H

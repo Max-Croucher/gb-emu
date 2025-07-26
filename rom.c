@@ -11,6 +11,23 @@
 #include <stdbool.h>
 #include "rom.h"
 
+static char *MBANK_NAMES[] = {
+  "ROM",
+  "MBANK1",
+  "MBANK2",
+  "MBANK3",
+  "MBANK4",
+  "MBANK5",
+  "MBANK6",
+  "MBANK7",
+  "MMM01",
+  "CAMERA",
+  "TAMA5",
+  "HUC3",
+  "HUC1",
+  "MBC1M"
+};
+
 gbRom rom; //extern
 extern uint8_t* ram;
 
@@ -225,7 +242,7 @@ void init_rom(FILE* romfile) {
     //Verify Checksum
     uint8_t raw_header[HEADER_SIZE];
     fseek(romfile, HEADER_START, SEEK_SET);
-    fread(raw_header, 1, HEADER_SIZE, romfile);
+    read_errors += HEADER_SIZE!=fread(raw_header, 1, HEADER_SIZE, romfile);
     for (uint8_t i=0; i<HEADER_SIZE; i++) {
         checksum += raw_header[i]+1;
     }
@@ -276,49 +293,6 @@ void init_ram() {
     };
     *(ram+0xFFFF) = 0x00; //IE
     memcpy(ram+0xFF00, &initial_registers, 128);
-}
-
-
-void initialise_rom_address_functions(void) {
-    /* Detect the ROM's MBANK type and set the functions write_MBANK_register, 
-    write_ext_ram, read_ext_ram and read_rom to the appropriate versions */
-    switch (rom.mbc_type)
-    {
-    case MBANK_NONE:
-        write_MBANK_register = &_NO_MBC_write_MBANK_register;
-        read_rom = &_NO_MBC_read_rom;
-        write_ext_ram = &_NO_MBC_write_ext_ram;
-        read_ext_ram = & _NO_MBC_read_ext_ram;
-        break;
-    case MBANK_1:
-    case MBANK_1_MULTICART:
-        write_MBANK_register = &_MBC1_write_MBANK_register;
-        read_rom = &_MBC1_read_rom;
-        write_ext_ram = &_MBC1_write_ext_ram;
-        read_ext_ram = & _MBC1_read_ext_ram;
-        if (rom.mbc_type == MBANK_1_MULTICART) read_rom = &_MBC1_MULTICART_read_rom;
-        break;
-    case MBANK_2:
-        write_MBANK_register = &_MBC2_write_MBANK_register;
-        read_rom = &_MBC2_read_rom;
-        write_ext_ram = &_MBC2_write_ext_ram;
-        read_ext_ram = & _MBC2_read_ext_ram;
-        break;
-    case MBANK_3:
-        write_MBANK_register = &_MBC3_write_MBANK_register;
-        read_rom = &_MBC3_read_rom;
-        write_ext_ram = &_MBC3_write_ext_ram;
-        read_ext_ram = & _MBC3_read_ext_ram;
-        break;
-    case MBANK_5:
-        write_MBANK_register = &_MBC5_write_MBANK_register;
-        read_rom = &_MBC5_read_rom;
-        write_ext_ram = &_MBC5_write_ext_ram;
-        read_ext_ram = & _MBC5_read_ext_ram;
-        break;
-    default:
-        print_error("MBANK type is not recognised or not supported!");
-    }
 }
 
 
@@ -592,4 +566,47 @@ uint8_t _MBC5_read_ext_ram(uint16_t addr) {
         return *(rom.ram + addr);
     }
     return 0xFF;
+}
+
+
+void initialise_rom_address_functions(void) {
+    /* Detect the ROM's MBANK type and set the functions write_MBANK_register, 
+    write_ext_ram, read_ext_ram and read_rom to the appropriate versions */
+    switch (rom.mbc_type)
+    {
+    case MBANK_NONE:
+        write_MBANK_register = &_NO_MBC_write_MBANK_register;
+        read_rom = &_NO_MBC_read_rom;
+        write_ext_ram = &_NO_MBC_write_ext_ram;
+        read_ext_ram = & _NO_MBC_read_ext_ram;
+        break;
+    case MBANK_1:
+    case MBANK_1_MULTICART:
+        write_MBANK_register = &_MBC1_write_MBANK_register;
+        read_rom = &_MBC1_read_rom;
+        write_ext_ram = &_MBC1_write_ext_ram;
+        read_ext_ram = & _MBC1_read_ext_ram;
+        if (rom.mbc_type == MBANK_1_MULTICART) read_rom = &_MBC1_MULTICART_read_rom;
+        break;
+    case MBANK_2:
+        write_MBANK_register = &_MBC2_write_MBANK_register;
+        read_rom = &_MBC2_read_rom;
+        write_ext_ram = &_MBC2_write_ext_ram;
+        read_ext_ram = & _MBC2_read_ext_ram;
+        break;
+    case MBANK_3:
+        write_MBANK_register = &_MBC3_write_MBANK_register;
+        read_rom = &_MBC3_read_rom;
+        write_ext_ram = &_MBC3_write_ext_ram;
+        read_ext_ram = & _MBC3_read_ext_ram;
+        break;
+    case MBANK_5:
+        write_MBANK_register = &_MBC5_write_MBANK_register;
+        read_rom = &_MBC5_read_rom;
+        write_ext_ram = &_MBC5_write_ext_ram;
+        read_ext_ram = & _MBC5_read_ext_ram;
+        break;
+    default:
+        print_error("MBANK type is not recognised or not supported!");
+    }
 }

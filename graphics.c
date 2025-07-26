@@ -162,10 +162,9 @@ void highlight_object(uint8_t i) {
 
 void draw_text(float x, float y, void *font, const char* string) {
     /* draw a string on the screen */  
-  char *c;
   glColor3f(0, 0, 0); 
   glRasterPos2f(x, y);
-  glutBitmapString(font, string);
+  glutBitmapString(font, (const unsigned char*)string);
 }
 
 void gl_tick_debug_window(void) {
@@ -736,8 +735,7 @@ bool tick_graphics(void) {
             if (frame_by_frame) {
                 if (debug_frames_done >= debug_frameskip) {
                     getchar();
-                    char x[1];
-                    scanf("");
+                    (void)! scanf("\n");
                 }
             } else {
                 framerate();
@@ -762,8 +760,7 @@ bool tick_graphics(void) {
             if (debug_scanlines) {
                 if (debug_frames_done >= debug_frameskip) {
                     getchar();
-                    char x[1];
-                    scanf("");
+                    (void)! scanf("\n");
                 }
                 glutMainLoopEvent();
                 glutPostRedisplay();

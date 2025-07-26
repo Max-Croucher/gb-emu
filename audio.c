@@ -184,14 +184,6 @@ void init_audio(void) {
 }
 
 
-void close_audio(void) {
-    /* close the audio devices */
-    ma_device_uninit(&device);
-    ma_waveform_uninit(&master_waveform);  /* Uninitialize the waveform after the device so we don't pull it from under the device while it's being reference in the data callback. */
-    if (do_export_wav) close_wav_file();
-}
-
-
 static inline void close_wav_file(void) {
     /* close a wav file and write file length */
     
@@ -203,6 +195,14 @@ static inline void close_wav_file(void) {
     fwrite(&data_size, sizeof(uint32_t), 1, raw_audio_file);
     fclose(raw_audio_file);
     fprintf(stderr, "Written %ld frames to WAV file\n", wav_frames_written);
+}
+
+
+void close_audio(void) {
+    /* close the audio devices */
+    ma_device_uninit(&device);
+    ma_waveform_uninit(&master_waveform);  /* Uninitialize the waveform after the device so we don't pull it from under the device while it's being reference in the data callback. */
+    if (do_export_wav) close_wav_file();
 }
 
 
@@ -239,13 +239,13 @@ static inline void event_ch1_freq_sweep(void) {
             ch1_freq_sweep_timer--;
         } else { // timer hit 0, reset
             ch1_freq_sweep_timer = pace;
-            uint16_t new_period;
+            uint16_t new_period = channels[0].pulse_period;
             if (direction) {
                 new_period -= delta;
             } else {
                 new_period += delta;
             }
-
+            channels[0].pulse_period = new_period;
             if ((!direction) && new_period > 0x7FF) { // pending overflow; immediately disable
                 *(ram+REG_NR52) &= ~1; // disable channel 1
                 return;

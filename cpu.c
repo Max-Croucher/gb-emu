@@ -13,6 +13,8 @@
 #include "rom.h"
 #include "registers.h"
 
+void handle_audio_register(uint16_t addr); // explicity define function declared in dependent translation unit
+
 JoypadState joypad_state = {0,0,0,0,0,0,0,0}; //extern
 Registers reg; //extern
 bool LOOP = 1; //extern
@@ -123,6 +125,7 @@ uint8_t get_r8(uint8_t regname) {
         sprintf(msg, "Invalid register id (%d).", regname);
         print_error(msg);
     }
+    return 0xFF;
 }
 
 
@@ -259,6 +262,7 @@ uint8_t decode_r16stk(uint8_t code) {
     default:
         fprintf(stderr, "Error: Unknown r16stk code!");
     }
+    return 0xFF;
 }
 
 
@@ -397,7 +401,7 @@ uint16_t read_word(uint16_t addr) {
 }
 
 
-uint8_t read_dma(void) {
+void read_dma(void) {
     /* read a byte from the appropriate location for DMA */
     if  (*(ram+REG_DMA) < 0x80) { // Read from ROM
         *(ram + 0xFE00 + OAM_DMA_timeout) = read_rom((*(ram+REG_DMA)<<8) + OAM_DMA_timeout);

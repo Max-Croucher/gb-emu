@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -O4
+CFLAGS= -O4 -Werror -Wall
 
 all: gbemu
 

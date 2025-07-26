@@ -23,21 +23,8 @@ typedef struct channel_attributes {
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 void init_audio(void);
-static inline void open_wav_file(void);
 void close_audio(void);
-static inline void close_wav_file(void);
-static inline void wav_write_sample(void);
-static inline void event_length(void);
-static inline void event_ch1_freq_sweep(void);
-static inline void event_envelope_sweep(void);
-static inline float high_pass(float value, uint8_t cap_id);
-static inline void write_to_buf(float val);
-static inline void queue_sample(void);
-static void enable_channel(uint8_t channel_id);
 void handle_audio_register(uint16_t addr);
-static inline void tick_pulse_channel(bool channel_id);
-static inline void tick_wave_channel(void);
-static inline void tick_noise_channel(void);
 void tick_audio(void);
 
 #endif //AUDIO
