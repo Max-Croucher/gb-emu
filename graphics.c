@@ -28,6 +28,9 @@ clock_t start,end;
 double rolling_frametime = 0;
 uint8_t framecount_offset = 0;
 uint8_t frame_report_offset = 0;
+
+#define SCREEN_WIDTH 160
+#define SCREEN_HEIGHT 144
 #define FRAMETIME_BUFSIZE 10
 #define TARGET_FRAMETIME 0.016742706
 #define FRAMETIME_REPORT_INTERVAL 12
@@ -40,19 +43,19 @@ static uint32_t dot = 0;
 uint8_t window_internal_counter = 0;
 GLint WindowMain = 1;
 GLint WindowDebug = 2;
-GLubyte texture[144][160][3];
+GLubyte texture[SCREEN_HEIGHT][SCREEN_WIDTH][3];
 GLubyte bg_tilemap[256][256][3];
 GLubyte window_tilemap[256][256][3];
 GLubyte object_tilemap[16][320][3];
 GLubyte vram_block_1[32][256][3];
 GLubyte vram_block_2[32][256][3];
 GLubyte vram_block_3[32][256][3];
-bool bgw_priority_map[144][160];
+bool bgw_priority_map[SCREEN_HEIGHT][SCREEN_WIDTH];
 ObjectAttribute objects[10];
 uint8_t objects_found = 0;
 uint8_t pixvals[5][3] = {{0xF8,0xF8,0xF8}, {0xA0,0xA0,0xA0}, {0x50,0x50,0x50}, {0x00,0x00,0x00}, {0xFF,0xFF,0xFF}};
 uint8_t dmgcols[5][3] = {{155,188,15},{139,172,15},{48,98,48},{15,56,15},{155*1.2,188*1.2,15*1.2}};
-uint8_t priority_object[160];
+uint8_t priority_object[SCREEN_WIDTH];
 bool old_stat_state = 0;
 bool lcd_enable = 0;
 bool debug_used_objects[40] = {0};
@@ -60,7 +63,7 @@ int debug_frameskip = 1;
 int debug_frames_done = 0;
 
 
-void framerate(void) {
+static inline void framerate(void) {
     /* run at the start of VBLANK to compute framerate and add delay to target 59.73Hz */
     double raw_frametime = ((double)(clock()-start)) / CLOCKS_PER_SEC;
     if (!hyperspeed) {
@@ -97,7 +100,7 @@ void gl_tick(void) {
     glClear(GL_COLOR_BUFFER_BIT);
     glPushMatrix();
     glEnable(GL_TEXTURE_2D);
-    glTexImage2D(GL_TEXTURE_2D,0,3,160,144,0,GL_RGB, GL_UNSIGNED_BYTE, texture);
+    glTexImage2D(GL_TEXTURE_2D,0,3,SCREEN_WIDTH,SCREEN_HEIGHT,0,GL_RGB, GL_UNSIGNED_BYTE, texture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -115,7 +118,7 @@ void gl_tick(void) {
 }
 
 
-void object_map_draw_quad(uint8_t i) {
+static inline void object_map_draw_quad(uint8_t i) {
     /* draw an object's sprite on the tilemap debugger */
     float height_unit = 72.0/512;
     glBegin(GL_POLYGON);
@@ -133,7 +136,15 @@ void object_map_draw_quad(uint8_t i) {
 }
 
 
-void highlight_object(uint8_t i) {
+static void draw_text(float x, float y, void *font, const char* string) {
+    /* draw a string on the screen */  
+  glColor3f(0, 0, 0); 
+  glRasterPos2f(x, y);
+  glutBitmapString(font, (const unsigned char*)string);
+}
+
+
+static inline void highlight_object(uint8_t i) {
     /* highlight a used object on the tilemap debugger */
     char string[32];
     sprintf(string, "%.2X,%.2X", *(ram + 0xFE01 + i*4), *(ram + 0xFE00 + i*4));
@@ -157,14 +168,6 @@ void highlight_object(uint8_t i) {
         glVertex2f(left,  bottom); // XYZ left, bottom
     glEnd();
 
-}
-
-
-void draw_text(float x, float y, void *font, const char* string) {
-    /* draw a string on the screen */  
-  glColor3f(0, 0, 0); 
-  glRasterPos2f(x, y);
-  glutBitmapString(font, (const unsigned char*)string);
 }
 
 void gl_tick_debug_window(void) {
@@ -342,6 +345,18 @@ void reshape_window(int w, int h) {
 }
 
 
+static void blank_screen(void) {
+    /* set the entire screen to black */
+    for (int i=0; i<SCREEN_HEIGHT; i++) {
+        for (int j=0; j<SCREEN_WIDTH; j++) {
+            texture[i][j][0]=pixvals[4][0];
+            texture[i][j][1]=pixvals[4][1];
+            texture[i][j][2]=pixvals[4][2];
+        }
+    }
+}
+
+
 void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     /* Main init procedure for graphics */
 
@@ -350,7 +365,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
 
     //init main window
-    glutInitWindowSize(160*3,144*3);
+    glutInitWindowSize(SCREEN_WIDTH*3,SCREEN_HEIGHT*3);
     glutInitWindowPosition(100,20);
     memcpy(rom_name, rom_title, 16);
     WindowMain = glutCreateWindow(rom_name);
@@ -468,19 +483,7 @@ void key_released(unsigned char key, int x, int y) {
 }
 
 
-void blank_screen(void) {
-    /* set the entire screen to black */
-    for (int i=0; i<144; i++) {
-        for (int j=0; j<160; j++) {
-            texture[i][j][0]=pixvals[4][0];
-            texture[i][j][1]=pixvals[4][1];
-            texture[i][j][2]=pixvals[4][2];
-        }
-    }
-}
-
-
-uint16_t interleave(uint16_t a, uint16_t b) {
+static uint16_t interleave(uint16_t a, uint16_t b) {
     /* interleave the lower 8 bits in a and b, with the bits in b coming first
         eg: a = 0000000012345678
             b = 00000000abcdefgh
@@ -498,7 +501,7 @@ uint16_t interleave(uint16_t a, uint16_t b) {
 }
 
 
-uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
+static uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
     uint16_t base_addr;
     if ((is_window_layer && (*(ram+REG_LCDC)&64)) || ((!is_window_layer) && (*(ram+REG_LCDC)&8))) {
         base_addr = 0x9C00;
@@ -508,7 +511,7 @@ uint8_t get_tile_id(uint16_t tilepos, bool is_window_layer) {
     return *(ram + base_addr + tilepos);
 }
 
-uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
+static uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
     /* get the memory address of a tile from the tile id and the addressing mode register */
     if (is_object || (*(ram+REG_LCDC)&16)) { // UNSIGNED addressing from 0x8000
         return 0x8000 + tile_id*16;
@@ -520,7 +523,7 @@ uint16_t get_tile_addr(uint8_t tile_id, bool is_object) {
 }
 
 
-void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
+static void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
     /* Read RAM to produce an 8x8 tile (stored in tile_data) */
     
     for (int i=0; i<8; i++) {
@@ -529,7 +532,7 @@ void load_tile(uint16_t tile_data[8], uint16_t tile_addr) {
 }
 
 
-void read_objects(void) {
+static inline void read_objects(void) {
     /* builds an array of up to 10 object attributes that intersect with the current scanline */
     objects_found = 0;
     uint8_t offset_scanline = *(ram+REG_LY) + 16;
@@ -558,13 +561,13 @@ void read_objects(void) {
 }
 
 
-uint8_t get_background_palette(uint8_t palette_value) {
+static uint8_t get_background_palette(uint8_t palette_value) {
     /* poll the BGP register */
     return (*(ram+REG_BGP) >> (2*palette_value))&3;
 }
 
 
-uint8_t get_object_palette(bool palette_id, uint8_t palette_value) {
+static uint8_t get_object_palette(bool palette_id, uint8_t palette_value) {
     /* poll the BGP register */
     if (palette_id) {
         return (*(ram+REG_OBP1) >> (2*palette_value))&3;
@@ -573,7 +576,7 @@ uint8_t get_object_palette(bool palette_id, uint8_t palette_value) {
 }
 
 
-int compare_obj_xvalue(const void *a, const void *b) {
+static inline int compare_obj_xvalue(const void *a, const void *b) {
     /* compare to ObjectAttributes by xpos, for sorting */
     ObjectAttribute *objA = (ObjectAttribute *)a;
     ObjectAttribute *objB = (ObjectAttribute *)b;
@@ -582,10 +585,10 @@ int compare_obj_xvalue(const void *a, const void *b) {
 }
 
 
-void draw_background() {
+static inline void draw_background() {
     /* Draw the background layer on the current scanline */
     if ((*(ram+REG_LCDC)&1) == 0) { //bg is disabled
-        for (int i=0; i<160; i++) {
+        for (int i=0; i<SCREEN_WIDTH; i++) {
             texture[143-*(ram+REG_LY)][i][0] = pixvals[0][0];
             texture[143-*(ram+REG_LY)][i][1] = pixvals[0][1];
             texture[143-*(ram+REG_LY)][i][2] = pixvals[0][2];
@@ -600,7 +603,7 @@ void draw_background() {
         load_tile(tiles[i], get_tile_addr(tile_id, 0));
     }
 
-    for (uint8_t i=0; i<160; i++) {
+    for (uint8_t i=0; i<SCREEN_WIDTH; i++) {
         uint8_t pix = (tiles[((i+left%8))>>3][top%8] >> (14-(2*(((i+left)%8)))))&3;
         bgw_priority_map[143-*(ram+REG_LY)][i] = (bool)pix;
         texture[143-*(ram+REG_LY)][i][0] = pixvals[get_background_palette(pix)][0];
@@ -610,7 +613,7 @@ void draw_background() {
 }
 
 
-void draw_window() {
+static inline void draw_window() {
     /* Draw the window layer on the current scanline */
     if ((*(ram+REG_LCDC)&0x21) == 0x21) { // Window Enable and BG/Window Enable bits are set
         if (*(ram+REG_LY) >= *(ram+REG_WX)) { // when scanline >= window Y
@@ -620,7 +623,7 @@ void draw_window() {
                 uint8_t tile_id = get_tile_id(i + (window_internal_counter>>3)*32, 1);
                 load_tile(tiles[i], get_tile_addr(tile_id, 0));
             }
-            for (int screen_x_pos = *(ram+REG_WY) - 7; screen_x_pos < 160; screen_x_pos++) {
+            for (int screen_x_pos = *(ram+REG_WY) - 7; screen_x_pos < SCREEN_WIDTH; screen_x_pos++) {
                 pixel_drawn = 1;
                 uint8_t window_x_pos = screen_x_pos - (*(ram+REG_WY) - 7);
                 //screen_y_pos is *(ram+REG_LY)
@@ -640,7 +643,7 @@ void draw_window() {
 }
 
 
-void draw_objects(void) {
+static inline void draw_objects(void) {
     /* Draw the object layer on the current scanline. Assumes objects are sorted by xpos, largest first */
     if (((*(ram+REG_LCDC))&2) && objects_found) { // draw objects if object layer is enabled and the current scanline contains at least one object
         uint16_t tiles[20][8];
@@ -652,7 +655,7 @@ void draw_objects(void) {
                 load_tile(tiles[i], get_tile_addr(objects[i].tileid, 1));
             }
             for (int16_t screen_x = objects[i].xpos-8; screen_x<objects[i].xpos; screen_x++) {
-                if (screen_x >= 0 && screen_x < 160) {
+                if (screen_x >= 0 && screen_x < SCREEN_WIDTH) {
                     ObjectAttribute target_object = objects[i];
                     uint8_t sprite_x = screen_x - (target_object.xpos-8);
                     if (!target_object.xflip) sprite_x = 7 - sprite_x;
@@ -675,6 +678,140 @@ void draw_objects(void) {
                         texture[143-*(ram+REG_LY)][screen_x][1] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][1];
                         texture[143-*(ram+REG_LY)][screen_x][2] = pixvals[get_object_palette(target_object.palette, (tile_line>>(2*sprite_x))&3)][2];
                     }
+                }
+            }
+        }
+    }
+}
+
+
+static void debug_draw_background_tile(uint16_t tile[8], GLubyte tex_array[256][256][3], uint8_t base_x, uint8_t base_y) {
+    /* draw a tile at a particular coordinate */
+    for (int v=0; v<8; v++) {
+        for (int u=0; u<8; u++) {
+            uint8_t pix = (tile[u] >> (14-2*v))&3;
+            tex_array[255-(base_y*8+u)][base_x*8+v][0] = pixvals[get_background_palette(pix)][0];
+            tex_array[255-(base_y*8+u)][base_x*8+v][1] = pixvals[get_background_palette(pix)][1];
+            tex_array[255-(base_y*8+u)][base_x*8+v][2] = pixvals[get_background_palette(pix)][2];
+        }
+    }
+}
+
+
+static void debug_draw_sprite_tile(uint16_t tile[8], uint8_t base_x, uint8_t base_y, ObjectAttribute object) {
+    /* draw a tile at a particular coordinate */
+    for (int v=0; v<8; v++) {
+        for (int u=0; u<8; u++) {
+            uint8_t pix;
+            if (object.xflip) {
+                pix = (tile[u] >> (2*v))&3;
+            } else {
+                pix = (tile[u] >> (14-2*v))&3;
+            }
+            uint8_t ypos;
+            if (object.yflip) {
+                ypos = base_y*8+u;
+            } else {
+                ypos = 15-(base_y*8+u);
+            }
+            object_tilemap[ypos][base_x*8+v][0] = pixvals[get_object_palette(object.palette, pix)][0];
+            object_tilemap[ypos][base_x*8+v][1] = pixvals[get_object_palette(object.palette, pix)][1];
+            object_tilemap[ypos][base_x*8+v][2] = pixvals[get_object_palette(object.palette, pix)][2];
+        }
+    }
+}
+
+
+static void debug_tilemaps(void) {
+    /* draw the background and window tilespaces on the debug window */
+    for (int y=0; y<32; y++) {
+        for (int x=0; x<32; x++) {
+            uint16_t tile[8];
+            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 0), 0));
+            debug_draw_background_tile(tile, bg_tilemap, x, y);
+
+            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 1), 0));
+            debug_draw_background_tile(tile, window_tilemap, x, y);
+        }
+    }
+    uint8_t bg_scanline = *(ram+REG_LY) + *(ram+REG_SCY);
+
+    for (int x=0; x<161; x++) {
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+SCREEN_HEIGHT)] [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+SCREEN_HEIGHT)] [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+SCREEN_HEIGHT)] [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
+    }
+    for (int y=0; y<SCREEN_HEIGHT; y++) {
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [2] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+SCREEN_WIDTH)] [0] = 255;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+SCREEN_WIDTH)] [1] = 0;
+        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+SCREEN_WIDTH)] [2] = 0;
+    }
+    if (debug_scanlines) {
+        for (int x=0; x<161; x++) {
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 0;
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
+            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 255;
+        }
+    }
+}
+
+
+static void debug_sprites(void) {
+    /* Debug util to display each sprite */
+
+    uint16_t blank[8] = {0,0,0,0,0,0,0,0};
+    for (int i=0; i<40; i++) {
+        uint8_t flags = *(ram+0xFE00+(i*4)+3);
+        ObjectAttribute object = (ObjectAttribute) {
+            .ypos = *(ram+0xFE00+(i*4)),
+            .xpos = *(ram+0xFE00+(i*4)+1),
+            .tileid = *(ram+0xFE00+(i*4)+2),
+            .priority = flags & (1<<7),
+            .yflip = flags & (1<<6),
+            .xflip = flags & (1<<5),
+            .palette = flags & (1<<4)
+        };
+        uint16_t sprite[8];
+        load_tile(sprite, get_tile_addr(object.tileid, 1));
+        debug_draw_sprite_tile(sprite, i, object.yflip, object);
+        if (*(ram+REG_LCDC)&4) { // 8x16 sprites
+            load_tile(sprite, get_tile_addr(object.tileid+1, 1));
+            debug_draw_sprite_tile(sprite, i, !object.yflip, object);
+        } else {
+            debug_draw_sprite_tile(blank, i, !object.yflip, object);
+        }
+    }
+}
+
+static void debug_tile_boundaries(void) {
+    for (uint8_t x=0; x<SCREEN_WIDTH; x++) {
+        if (!((*(ram + REG_LY) | x)&7)) {
+            texture[143-*(ram + REG_LY)][x][0] = 255;
+            texture[143-*(ram + REG_LY)][x][1] = 0;
+            texture[143-*(ram + REG_LY)][x][2] = 0;
+        }
+    }
+}
+
+
+static void debug_vram(GLubyte block[32][256][3], uint16_t starting_addr) {
+    /* draw vram for debugging */
+    for (uint8_t i=0; i<4; i++) {
+        for (uint8_t j=0; j<32; j++) {
+            uint16_t tile[8];
+            load_tile(tile, starting_addr + (i*32+j)*16);
+            for (int v=0; v<8; v++) {
+                for (int u=0; u<8; u++) {
+                    uint8_t pix = (tile[v] >> (14-2*u))&3;
+                    block[31-(i*8+v)][j*8+u][0] = pixvals[get_background_palette(pix)][0];
+                    block[31-(i*8+v)][j*8+u][1] = pixvals[get_background_palette(pix)][1];
+                    block[31-(i*8+v)][j*8+u][2] = pixvals[get_background_palette(pix)][2];
                 }
             }
         }
@@ -715,7 +852,7 @@ bool tick_graphics(void) {
             *(ram+REG_STAT) += 1; // set ppu mode to 1
             *(ram+REG_IF) |= 1; // Request a VBlank interrupt
             xoffset++;
-            if (xoffset == 144) xoffset = 0;
+            if (xoffset == SCREEN_HEIGHT) xoffset = 0;
             window_internal_counter = 0;
             glutMainLoopEvent();
             glutPostRedisplay();
@@ -740,12 +877,12 @@ bool tick_graphics(void) {
             } else {
                 framerate();
             }
-        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 0) { // New scanline
+        } else if ((*(ram+REG_LY) < SCREEN_HEIGHT) && (dot % 456) == 0) { // New scanline
             *(ram+REG_STAT) &= 0xFC;
             *(ram+REG_STAT) += 2; // set ppu mode to 2
             read_objects();
             qsort(objects, objects_found, sizeof(ObjectAttribute), compare_obj_xvalue);
-        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 80) { // Enter drawing mode
+        } else if ((*(ram+REG_LY) < SCREEN_HEIGHT) && (dot % 456) == 80) { // Enter drawing mode
             *(ram+REG_STAT) &= 0xFC;
             *(ram+REG_STAT) += 3; // set ppu mode to 3
             draw_background();
@@ -755,7 +892,7 @@ bool tick_graphics(void) {
                 debug_tile_boundaries();
             }
 
-        } else if ((*(ram+REG_LY) < 144) && (dot % 456) == 232) { // Enter Hblank
+        } else if ((*(ram+REG_LY) < SCREEN_HEIGHT) && (dot % 456) == 232) { // Enter Hblank
             *(ram+REG_STAT) &= 0xFC; // set ppu mode to 0
             if (debug_scanlines) {
                 if (debug_frames_done >= debug_frameskip) {
@@ -784,139 +921,5 @@ bool tick_graphics(void) {
         return !dot;
     } else {
         return 0;
-    }
-}
-
-
-void debug_draw_background_tile(uint16_t tile[8], GLubyte tex_array[256][256][3], uint8_t base_x, uint8_t base_y) {
-    /* draw a tile at a particular coordinate */
-    for (int v=0; v<8; v++) {
-        for (int u=0; u<8; u++) {
-            uint8_t pix = (tile[u] >> (14-2*v))&3;
-            tex_array[255-(base_y*8+u)][base_x*8+v][0] = pixvals[get_background_palette(pix)][0];
-            tex_array[255-(base_y*8+u)][base_x*8+v][1] = pixvals[get_background_palette(pix)][1];
-            tex_array[255-(base_y*8+u)][base_x*8+v][2] = pixvals[get_background_palette(pix)][2];
-        }
-    }
-}
-
-
-void debug_draw_sprite_tile(uint16_t tile[8], uint8_t base_x, uint8_t base_y, ObjectAttribute object) {
-    /* draw a tile at a particular coordinate */
-    for (int v=0; v<8; v++) {
-        for (int u=0; u<8; u++) {
-            uint8_t pix;
-            if (object.xflip) {
-                pix = (tile[u] >> (2*v))&3;
-            } else {
-                pix = (tile[u] >> (14-2*v))&3;
-            }
-            uint8_t ypos;
-            if (object.yflip) {
-                ypos = base_y*8+u;
-            } else {
-                ypos = 15-(base_y*8+u);
-            }
-            object_tilemap[ypos][base_x*8+v][0] = pixvals[get_object_palette(object.palette, pix)][0];
-            object_tilemap[ypos][base_x*8+v][1] = pixvals[get_object_palette(object.palette, pix)][1];
-            object_tilemap[ypos][base_x*8+v][2] = pixvals[get_object_palette(object.palette, pix)][2];
-        }
-    }
-}
-
-
-void debug_tilemaps(void) {
-    /* draw the background and window tilespaces on the debug window */
-    for (int y=0; y<32; y++) {
-        for (int x=0; x<32; x++) {
-            uint16_t tile[8];
-            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 0), 0));
-            debug_draw_background_tile(tile, bg_tilemap, x, y);
-
-            load_tile(tile, get_tile_addr(get_tile_id(y*32+x, 1), 0));
-            debug_draw_background_tile(tile, window_tilemap, x, y);
-        }
-    }
-    uint8_t bg_scanline = *(ram+REG_LY) + *(ram+REG_SCY);
-
-    for (int x=0; x<161; x++) {
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY))]     [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+144)] [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 0;
-    }
-    for (int y=0; y<144; y++) {
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX))]     [2] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [0] = 255;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [1] = 0;
-        bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+160)] [2] = 0;
-    }
-    if (debug_scanlines) {
-        for (int x=0; x<161; x++) {
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 0;
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
-            bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [2] = 255;
-        }
-    }
-}
-
-
-void debug_sprites(void) {
-    /* Debug util to display each sprite */
-
-    uint16_t blank[8] = {0,0,0,0,0,0,0,0};
-    for (int i=0; i<40; i++) {
-        uint8_t flags = *(ram+0xFE00+(i*4)+3);
-        ObjectAttribute object = (ObjectAttribute) {
-            .ypos = *(ram+0xFE00+(i*4)),
-            .xpos = *(ram+0xFE00+(i*4)+1),
-            .tileid = *(ram+0xFE00+(i*4)+2),
-            .priority = flags & (1<<7),
-            .yflip = flags & (1<<6),
-            .xflip = flags & (1<<5),
-            .palette = flags & (1<<4)
-        };
-        uint16_t sprite[8];
-        load_tile(sprite, get_tile_addr(object.tileid, 1));
-        debug_draw_sprite_tile(sprite, i, object.yflip, object);
-        if (*(ram+REG_LCDC)&4) { // 8x16 sprites
-            load_tile(sprite, get_tile_addr(object.tileid+1, 1));
-            debug_draw_sprite_tile(sprite, i, !object.yflip, object);
-        } else {
-            debug_draw_sprite_tile(blank, i, !object.yflip, object);
-        }
-    }
-}
-
-void debug_tile_boundaries(void) {
-    for (uint8_t x=0; x<160; x++) {
-        if (!((*(ram + REG_LY) | x)&7)) {
-            texture[143-*(ram + REG_LY)][x][0] = 255;
-            texture[143-*(ram + REG_LY)][x][1] = 0;
-            texture[143-*(ram + REG_LY)][x][2] = 0;
-        }
-    }
-}
-
-
-void debug_vram(GLubyte block[32][256][3], uint16_t starting_addr) {
-    /* draw vram for debugging */
-    for (uint8_t i=0; i<4; i++) {
-        for (uint8_t j=0; j<32; j++) {
-            uint16_t tile[8];
-            load_tile(tile, starting_addr + (i*32+j)*16);
-            for (int v=0; v<8; v++) {
-                for (int u=0; u<8; u++) {
-                    uint8_t pix = (tile[v] >> (14-2*u))&3;
-                    block[31-(i*8+v)][j*8+u][0] = pixvals[get_background_palette(pix)][0];
-                    block[31-(i*8+v)][j*8+u][1] = pixvals[get_background_palette(pix)][1];
-                    block[31-(i*8+v)][j*8+u][2] = pixvals[get_background_palette(pix)][2];
-                }
-            }
-        }
     }
 }

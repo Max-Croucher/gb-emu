@@ -45,15 +45,8 @@ typedef struct {
 } gbRom;
 
 void init_rom(FILE* romfile);
-void print_header(void);
 void print_error(char errormsg[]);
-int decode_rom_size(uint8_t romcode);
-int decode_ram_size(uint8_t ramcode);
-bool detect_multicart(void);
-void decode_cartridge_type(void);
 void load_rom(char filename[]);
 void init_ram(void);
-void initialise_rom_address_functions(void);
-void freeze_mbank3_rtc(void);
 
 #endif // ROM_H

@@ -52,7 +52,7 @@ void print_error(char errormsg[]) {
 }
 
 
-void print_header() {
+static inline void print_header() {
     /* print the contents of a gameboy header */
     printf("Header contents:\n");
     printf("Title:          %s\n", rom.title);
@@ -73,14 +73,14 @@ void print_header() {
 }
 
 
-int decode_rom_size(uint8_t romcode) {
+static inline int decode_rom_size(uint8_t romcode) {
     /* Decode the rom size indicated in a gameboy header, returns the number of bytes */
     if (romcode > 8) print_error("Unable to decode rom size.");
     return 1<<(romcode+15); //0 means 32K, 1 means 64k and so on.
 }
 
 
-int decode_ram_size(uint8_t ramcode) {
+static inline int decode_ram_size(uint8_t ramcode) {
     /* Decode the ram size indicated in a gameboy header, returns the number of bytes */
     switch (ramcode)
     {
@@ -103,7 +103,7 @@ int decode_ram_size(uint8_t ramcode) {
 }
 
 
-bool detect_multicart(void) {
+static inline bool detect_multicart(void) {
     /* if the ROM uses MBC1, check if the game contains a multicart by verifying
     at least three of the first four banks contains the NINTENDO logo checksum
     (i.e. 0x0104-0x0133 has the appropriate checksum) */
@@ -120,7 +120,7 @@ bool detect_multicart(void) {
 }
 
 
-void decode_cartridge_type(void) {
+static inline void decode_cartridge_type(void) {
     /* decode cartridge type, setting struct fields */
     rom.has_timer = false;
     switch (rom.cart_type_id) { // determine mbank type
@@ -250,28 +250,6 @@ void init_rom(FILE* romfile) {
 
     if (rom.mbc_type == MBANK_1 && detect_multicart()) rom.mbc_type = MBANK_1_MULTICART;
     print_header();
-}
-
-
-void load_rom(char filename[]) {
-	/* Read a rom file and load contents */
-    fprintf(stderr,"Attempting to load rom file %s\n", filename);
-	FILE *romfile;
-	romfile = fopen(filename, "rb");
-	if (romfile == NULL) {
-		print_error("Unable to open ROM file.");
-	}
-	
-    init_rom(romfile);
-
-        //load rom into memory
-    fseek(romfile, 0, SEEK_SET);
-    int bytes_read = fread(rom.rom, 1, rom.romsize, romfile);
-    if (bytes_read != rom.romsize) print_error("Unable to load rom file.");
-
-    fprintf(stderr,"Successfully loaded rom file.\n");
-	fclose(romfile);
-    initialise_rom_address_functions();
 }
 
 
@@ -569,7 +547,7 @@ uint8_t _MBC5_read_ext_ram(uint16_t addr) {
 }
 
 
-void initialise_rom_address_functions(void) {
+static inline void initialise_rom_address_functions(void) {
     /* Detect the ROM's MBANK type and set the functions write_MBANK_register, 
     write_ext_ram, read_ext_ram and read_rom to the appropriate versions */
     switch (rom.mbc_type)
@@ -609,4 +587,26 @@ void initialise_rom_address_functions(void) {
     default:
         print_error("MBANK type is not recognised or not supported!");
     }
+}
+
+
+void load_rom(char filename[]) {
+	/* Read a rom file and load contents */
+    fprintf(stderr,"Attempting to load rom file %s\n", filename);
+	FILE *romfile;
+	romfile = fopen(filename, "rb");
+	if (romfile == NULL) {
+		print_error("Unable to open ROM file.");
+	}
+	
+    init_rom(romfile);
+
+        //load rom into memory
+    fseek(romfile, 0, SEEK_SET);
+    int bytes_read = fread(rom.rom, 1, rom.romsize, romfile);
+    if (bytes_read != rom.romsize) print_error("Unable to load rom file.");
+
+    fprintf(stderr,"Successfully loaded rom file.\n");
+	fclose(romfile);
+    initialise_rom_address_functions();
 }
