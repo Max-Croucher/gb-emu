@@ -5,7 +5,7 @@ This project is for my own learning and experience, and is therefore written wit
  - Many games, including Tetris, Kirby and Link's Awakening
  - Intructions are implemented for machine cycle accuracy
  - Blargg CPU instruction tests
- - Common MBANK controllers (MBC1, MBC2, MBC5)
+ - Common MBANK controllers (MBC1, MBC2, MBC3 (without clock), MBC5)
  - Interrupts and timers
  - Graphics, including the Acid2 test
  - Sound, although sometimes the noise channel sounds wrong.
@@ -19,7 +19,7 @@ This project is for my own learning and experience, and is therefore written wit
  - Add the ability to output a screenshot on command or breakpoint
  - Refactor objects on the address bus
  - Fix some dma edge cases
- - Implement MBC3 including RTC
+ - Implement MBC3 clock support
  - Implement the ability to save games and create/use save states
 
 ## Lofty Goals:
