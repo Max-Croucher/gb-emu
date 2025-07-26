@@ -335,8 +335,17 @@ void gl_tick_debug_window(void) {
 
 
 void reshape_window(int w, int h) {
-    /* Ensure window is accurately scaled*/
-    glViewport(0,0,(GLsizei)w, (GLsizei)h);
+    /* Ensure window is accurately scaled */
+    if (w * SCREEN_HEIGHT > h * SCREEN_WIDTH) { // window is too wide
+        int target_width = (h * SCREEN_WIDTH) / SCREEN_HEIGHT;
+        int border = (w - target_width) / 2;
+        glViewport(border,0,(GLsizei)(target_width), (GLsizei)h);
+    } else { // window is too tall
+        int target_height = (w * SCREEN_HEIGHT) / SCREEN_WIDTH;
+        int border = (h - target_height) / 2;
+        glViewport(0,border,(GLsizei)w, (GLsizei)(target_height));
+    }
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0,1,0,1,-1.0,1.0);
