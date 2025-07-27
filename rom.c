@@ -648,8 +648,8 @@ char* replace_file_extension(char* filename, char* extension) {
 }
 
 
-void open_saved_ram(char* filename) {
-    /* Reads the given save file and copies contents into emulated RAM if such RAM exists.
+void load_external_ram(char* filename) {
+    /* Reads the given save file and copies contents into emulated external RAM if such RAM exists.
     Does nothing if the file doesn't exist */
     if (rom.external_ram_size) {
         FILE* save_file = fopen(filename, "rb");
@@ -668,14 +668,16 @@ void open_saved_ram(char* filename) {
 }
 
 
-void close_saved_ram(char* filename) {
-    /* Saves emulated RAM to the given save file if such RAM exists. */
+void save_external_ram(char* filename) {
+    /* Saves emulated external RAM to the given save file if such RAM exists. */
     if (rom.external_ram_size) {
         FILE* save_file = fopen(filename, "wb");
         if (save_file == NULL) {
             fprintf(stderr, "Unable to save external RAM to save file.\n");
+        } else {
+            fprintf(stderr, "Sucessfully saved game!\n");
+            fwrite(rom.external_ram, sizeof(uint8_t), rom.external_ram_size, save_file);
         }
-        fwrite(rom.external_ram, sizeof(uint8_t), rom.external_ram_size, save_file);
         fclose(save_file);
     }
 }

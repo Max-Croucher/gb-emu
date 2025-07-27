@@ -49,8 +49,8 @@ void print_error(char errormsg[]);
 void load_rom(char filename[]);
 void init_ram(void);
 char* replace_file_extension(char* filename, char* extension);
-void open_saved_ram(char* filename);
-void close_saved_ram(char* filename);
+void load_external_ram(char* filename);
+void save_external_ram(char* filename);
 void free_rom_data(void);
 
 #endif // ROM_H

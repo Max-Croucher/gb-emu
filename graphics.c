@@ -12,6 +12,7 @@
 #include <GL/freeglut.h>
 #include <time.h>
 #include "cpu.h"
+#include "rom.h"
 #include "graphics.h"
 
 extern uint8_t* ram;
@@ -23,6 +24,9 @@ extern bool debug_tilemap;
 extern bool debug_scanlines;
 extern bool dmg_colours;
 extern bool frame_by_frame;
+extern char* save_filename;
+extern bool do_save_game;
+
 
 clock_t start,end;
 double rolling_frametime = 0;
@@ -418,39 +422,52 @@ void window_closed(void) {
 
 void key_pressed(unsigned char key, int x, int y) {
     /* handle keys being pressed */
-    bool has_changed = 1;
-    switch (key)
-    {
-    case 'w':
-        joypad_state.up = 1;
-        break;
-    case 's':
-        joypad_state.down = 1;
-        break;
-    case 'a':
-        joypad_state.left = 1;
-        break;
-    case 'd':
-        joypad_state.right = 1;
-        break;
-    case ',':
-        joypad_state.B = 1;
-        break;
-    case '.':
-        joypad_state.A = 1;
-        break;
-    case ';':
-        joypad_state.start = 1;
-        break;
-    case '\'':
-        joypad_state.select = 1;
-        break;
-    case 'q':
-    case 27:
-        LOOP = 0;
-        break;
-    default:
-        has_changed = 0;
+    bool has_changed = 0;
+    uint16_t keyboard_modifiers = glutGetModifiers();
+    if (keyboard_modifiers == GLUT_ACTIVE_CTRL) { // handle ctrl + <key>
+        switch (key + 96) // if ctrl is pressed then it masks out 0x60
+        {
+        case 's': // ctrl + s (save external RAM)
+            if (do_save_game) save_external_ram(save_filename);
+        }
+
+    } else if (keyboard_modifiers) {
+        // skip other modifiers (alt, shift, super)
+    } else { // only register key press if shift, ctrl, etc. keys are not held
+        has_changed = 1;
+        switch (key)
+        {
+        case 'w':
+            joypad_state.up = 1;
+            break;
+        case 's':
+            joypad_state.down = 1;
+            break;
+        case 'a':
+            joypad_state.left = 1;
+            break;
+        case 'd':
+            joypad_state.right = 1;
+            break;
+        case ',':
+            joypad_state.B = 1;
+            break;
+        case '.':
+            joypad_state.A = 1;
+            break;
+        case ';':
+            joypad_state.start = 1;
+            break;
+        case '\'':
+            joypad_state.select = 1;
+            break;
+        case 'q':
+        case 27:
+            LOOP = 0;
+            break;
+        default:
+            has_changed = 0;
+        }
     }
     if (has_changed) joypad_io();
 }

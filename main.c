@@ -45,13 +45,13 @@ bool dmg_colours = 0; //extern
 bool debug_tilemap = 0; //extern
 bool debug_scanlines = 0; //extern
 bool frame_by_frame = 0; //extern
+char* save_filename; //extern
+bool do_save_game = 1; //extern
 bool hyperspeed = 0;
 bool no_audio = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
-bool do_save_game = 1;
 bool do_custom_save_name = 0;
-char* save_filename;
 
 extern uint16_t system_counter;
 extern uint8_t TIMA_overflow_delay;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
 
     if (do_save_game) {
         if (!do_custom_save_name) save_filename = replace_file_extension(argv[1], "sav");
-        open_saved_ram(save_filename);
+        load_external_ram(save_filename);
     }
 
     if (!no_audio) init_audio();
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
 
     // write save ram to a file
     if (do_save_game) {
-        close_saved_ram(save_filename);
+        save_external_ram(save_filename);
         if (!do_custom_save_name) free(save_filename);
     }
 
