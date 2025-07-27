@@ -69,8 +69,8 @@ static inline void print_header() {
         rom.has_battery ? "+BATTERY" : "",
         rom.has_timer ? "+TIMER" : ""
     );
-    printf("ROM Size Code:  %d\n", rom.romsize);
-    printf("RAM Size Code:  %d\n", rom.ramsize);
+    printf("ROM Size Code:  %d\n", rom.rom_size);
+    printf("RAM Size Code:  %d\n", rom.external_ram_size);
     printf("Global Release: 0x%.2x\n", rom.locale);
     printf("Licensee (old): 0x%.2x\n", rom.old_licensee);
     printf("Version:        %d\n", rom.version);
@@ -111,12 +111,12 @@ static inline bool detect_multicart(void) {
     /* if the ROM uses MBC1, check if the game contains a multicart by verifying
     at least three of the first four banks contains the NINTENDO logo checksum
     (i.e. 0x0104-0x0133 has the appropriate checksum) */
-    if (rom.romsize != 1<<20) return 0; // not 1Mb
+    if (rom.rom_size != 1<<20) return 0; // not 1Mb
     uint8_t num_successes = 0;
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t checksum = 0x46;
         for (uint32_t addr = 0x4000*i + 0x0104; addr < 0x4000*i + 0x0134; addr++) {
-            checksum -= *(rom.rom + addr);
+            checksum -= *(rom.rom_data + addr);
         }
         if (!checksum) num_successes++;
     }
@@ -224,16 +224,16 @@ void init_rom(FILE* romfile) {
     uint8_t ramcode;
     read_errors += 1!=fread(&romcode, 1, 1, romfile);
     read_errors += 1!=fread(&ramcode, 1, 1, romfile);
-    rom.romsize = decode_rom_size(romcode);
-    rom.ramsize = decode_ram_size(ramcode);
+    rom.rom_size = decode_rom_size(romcode);
+    rom.external_ram_size = decode_ram_size(ramcode);
 
-    rom.rom = malloc(rom.romsize);
+    rom.rom_data = malloc(rom.rom_size);
     if (rom.mbc_type == MBANK_2) {
-        rom.ram = malloc(0x0200);
-    } else if (rom.ramsize) {
-        rom.ram = malloc(rom.ramsize);
+        rom.external_ram = malloc(0x0200);
+    } else if (rom.external_ram_size) {
+        rom.external_ram = malloc(rom.external_ram_size);
     } else {
-        rom.ram = 0;
+        rom.external_ram = 0;
     }
 
     read_errors += 1!=fread(&rom.locale, 1, 1, romfile);
@@ -260,7 +260,7 @@ void init_rom(FILE* romfile) {
 void init_ram() {
     /* Initialise the gameboy RAM, loading the first 32K of rom at 0x0000 */
     ram = malloc(0x10000);
-    memcpy(ram, rom.rom, 0x8000);
+    memcpy(ram, rom.rom_data, 0x8000);
 
     //various ram addrs
     uint8_t initial_registers[128] = {
@@ -285,7 +285,7 @@ static void _NO_MBC_write_MBANK_register(uint16_t mbc_reg, uint8_t byte) {
 
 static uint8_t _NO_MBC_read_rom(uint32_t addr) {
     /* Read from ROM, without switching */
-    return *(rom.rom + addr);
+    return *(rom.rom_data + addr);
 }
 
 
@@ -305,7 +305,7 @@ static void _MBC1_write_MBANK_register(uint16_t addr, uint8_t byte) {
     switch (addr >> 13)
     {
     case 0: // 0x0000-0x1FFF RAM enable
-        if (rom.ramsize) MBANK_RAMG = ((byte&0xF) == 0xA);
+        if (rom.external_ram_size) MBANK_RAMG = ((byte&0xF) == 0xA);
         break;
         //fprintf(stderr, "RAM enable set to %s.\n", (byte == 0xA) ? "ON" : "OFF");
     case 1: // 0x2000-0x3FFF ROM bank switch
@@ -328,14 +328,14 @@ static uint8_t _MBC1_read_rom(uint32_t addr) {
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= (MBANK_reg_BANK1<<14); // Include MBANK ROM id to bits 18-14
         addr |= (MBANK_reg_BANK2<<19); // Include MBANK RAM id to bits 20-19
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     } else { // reading from 0x0000-0x3FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         // DO NOT Include MBANK ROM id at bits 18-14
         addr |= ((MBANK_reg_BANK2*MBANK_mode)<<19); // Include MBANK RAM id to bits 20-19 if mode select is 1
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     }
 }
 
@@ -346,14 +346,14 @@ static uint8_t _MBC1_MULTICART_read_rom(uint32_t addr) {
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= ((MBANK_reg_BANK1&0xF)<<14); // Include MBANK ROM id to bits 17-14. Note in MBC1M mode, this is only 4 bits long
         addr |= (MBANK_reg_BANK2<<18); // Include MBANK RAM id to bits 19-18
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     } else { // reading from 0x0000-0x3FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         // DO NOT Include MBANK ROM id at bits 17-14
         addr |= ((MBANK_reg_BANK2*MBANK_mode)<<18); // Include MBANK RAM id to bits 19-18 if mode select is 1
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     }
 }
 
@@ -363,8 +363,8 @@ static void _MBC1_write_ext_ram(uint16_t addr, uint8_t byte) {
     if (MBANK_RAMG) {
         addr &= 0x0FFF; // Truncate to bits 12-0
         addr |= (MBANK_reg_BANK2*MBANK_mode)<<13; // Add MBANK RAM id to bits 14-13 if mode select is 1
-        addr &= (rom.ramsize-1); // Truncate to ram size
-        *(rom.ram + addr) = byte;
+        addr &= (rom.external_ram_size-1); // Truncate to ram size
+        *(rom.external_ram + addr) = byte;
     }
 }
 
@@ -374,8 +374,8 @@ static uint8_t _MBC1_read_ext_ram(uint16_t addr) {
     if (MBANK_RAMG) {
         addr &= 0x0FFF; // Truncate to bits 12-0
         addr += (MBANK_reg_BANK2*MBANK_mode)<<13; // Include MBANK RAM id to bits 14-13 if mode select is 1
-        addr &= (rom.ramsize-1); // Truncate to ram size
-        return *(rom.ram + addr);
+        addr &= (rom.external_ram_size-1); // Truncate to ram size
+        return *(rom.external_ram + addr);
     } else {
         return 0xFF; // RAM is disabled
     }
@@ -400,12 +400,12 @@ static uint8_t _MBC2_read_rom(uint32_t addr) {
     if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= ((MBANK_reg_BANK1&0xF)<<14); // Include MBANK ROM id to bits 17-14. this is only 4 bits long
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     } else { // reading from 0x0000-0x3FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     }
 }
 
@@ -414,7 +414,7 @@ static void _MBC2_write_ext_ram(uint16_t addr, uint8_t byte) {
     /* Write to external MBANK2 RAM. Addr is normalised to 0 */
     if (MBANK_RAMG) {
         addr &= 0x01FF; // Truncate to bits 8-0
-        *(rom.ram + addr) = byte|0xF0; // only the lower 4 bits are usable
+        *(rom.external_ram + addr) = byte|0xF0; // only the lower 4 bits are usable
     }
 }
 
@@ -423,7 +423,7 @@ uint8_t _MBC2_read_ext_ram(uint16_t addr) {
     /* Read from external MBANK2 RAM. Addr is normalised to 0 */
     if (MBANK_RAMG) {
         addr &= 0x01FF; // Truncate to bits 8-0
-        return *(rom.ram + addr)|0xF0; // only the lower 4 bits are usable
+        return *(rom.external_ram + addr)|0xF0; // only the lower 4 bits are usable
     }
     return 0xFF;
 }
@@ -434,7 +434,7 @@ static void _MBC3_write_MBANK_register(uint16_t addr, uint8_t byte) {
     switch (addr >> 13)
     {
     case 0: // 0x0000-0x1FFF RAM enable
-        if (rom.ram) MBANK_RAMG = ((byte&0xF) == 0x0A);
+        if (rom.external_ram) MBANK_RAMG = ((byte&0xF) == 0x0A);
         break;
     case 1: // 0x2000-0x3FFF ROM bank switch
         MBANK_reg_BANK1 = byte & 0x7F;
@@ -457,12 +457,12 @@ static uint8_t _MBC3_read_rom(uint32_t addr) {
     if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= (MBANK_reg_BANK1<<14); // Include MBANK ROM id to bits 21-14.
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     } else { // reading from 0x0000-0x3FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     }
 }
 
@@ -472,8 +472,8 @@ static void _MBC3_write_ext_ram(uint16_t addr, uint8_t byte) {
     if (MBANK_RAMG && MBANK_reg_BANK2 < 7) {
         addr &= 0x01FFF; // Truncate to bits 12-0
         addr += (MBANK_reg_BANK2&3)<<13; // Include MBANK RAM id
-        addr &= (rom.ramsize-1); // Truncate to ram size
-        *(rom.ram + addr) = byte;
+        addr &= (rom.external_ram_size-1); // Truncate to ram size
+        *(rom.external_ram + addr) = byte;
     }
 }
 
@@ -483,8 +483,8 @@ uint8_t _MBC3_read_ext_ram(uint16_t addr) {
     if (MBANK_RAMG && MBANK_reg_BANK2 < 7) {
         addr &= 0x01FFF; // Truncate to bits 12-0
         addr += (MBANK_reg_BANK2&3)<<13; // Include MBANK RAM id
-        addr &= (rom.ramsize-1); // Truncate to ram size
-        return *(rom.ram + addr);
+        addr &= (rom.external_ram_size-1); // Truncate to ram size
+        return *(rom.external_ram + addr);
     }
     return 0xFF;
 }
@@ -496,7 +496,7 @@ static void _MBC5_write_MBANK_register(uint16_t addr, uint8_t byte) {
     {
     case 0:
     case 1: // 0x0000-0x1FFF RAM enable
-        if (rom.ramsize) MBANK_RAMG = ((byte&0xF) == 0xA);
+        if (rom.external_ram_size) MBANK_RAMG = ((byte&0xF) == 0xA);
         break;
     case 2: // 0x2000-0x2FFF ROM bank switch lower 8 bits
         MBANK_reg_BANK1 &= 0x0100;
@@ -520,12 +520,12 @@ static uint8_t _MBC5_read_rom(uint32_t addr) {
     if ((addr >> 14)&1) { // reading from 0x4000-0x7FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
         addr |= MBANK_reg_BANK1<<14; // Include MBANK ROM id to bits 22-14. this is 9 bits long
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     } else { // reading from 0x0000-0x3FFF
         addr &= 0x3FFF; // Truncate to bits 13-0
-        addr &= (rom.romsize-1); // Truncate to rom size
-        return *(rom.rom + addr);
+        addr &= (rom.rom_size-1); // Truncate to rom size
+        return *(rom.rom_data + addr);
     }
 }
 
@@ -535,7 +535,7 @@ static void _MBC5_write_ext_ram(uint16_t addr, uint8_t byte) {
     if (MBANK_RAMG) {
         addr &= 0x0FFF; // Truncate to bit 12
         addr += (MBANK_reg_BANK2&0xF)<<13;
-        *(rom.ram + addr) = byte;
+        *(rom.external_ram + addr) = byte;
     }
 }
 
@@ -545,7 +545,7 @@ uint8_t _MBC5_read_ext_ram(uint16_t addr) {
     if (MBANK_RAMG) {
         addr &= 0x0FFF; // Truncate to bit 12
         addr += (MBANK_reg_BANK2&0xF)<<13;
-        return *(rom.ram + addr);
+        return *(rom.external_ram + addr);
     }
     return 0xFF;
 }
@@ -605,10 +605,10 @@ void load_rom(char filename[]) {
 	
     init_rom(romfile);
 
-        //load rom into memory
+    //load rom into memory
     fseek(romfile, 0, SEEK_SET);
-    int bytes_read = fread(rom.rom, 1, rom.romsize, romfile);
-    if (bytes_read != rom.romsize) print_error("Unable to load rom file.");
+    int bytes_read = fread(rom.rom_data, 1, rom.rom_size, romfile);
+    if (bytes_read != rom.rom_size) print_error("Unable to load rom file.");
 
     fprintf(stderr,"Successfully loaded rom file.\n");
 	fclose(romfile);
@@ -651,15 +651,15 @@ char* replace_file_extension(char* filename, char* extension) {
 void open_saved_ram(char* filename) {
     /* Reads the given save file and copies contents into emulated RAM if such RAM exists.
     Does nothing if the file doesn't exist */
-    if (rom.ramsize) {
+    if (rom.external_ram_size) {
         FILE* save_file = fopen(filename, "rb");
         if (save_file != NULL) {
             fseek(save_file, 0, SEEK_END);
             size_t file_size = ftell(save_file);
-            if (file_size < rom.ramsize) print_error("Save file is too small.");
-            if (file_size > rom.ramsize) fprintf(stderr, "WARNING: Save file is larger than expected. Proceeding anyway.\n");
+            if (file_size < rom.external_ram_size) print_error("Save file is too small.");
+            if (file_size > rom.external_ram_size) fprintf(stderr, "WARNING: Save file is larger than expected. Proceeding anyway.\n");
             fseek(save_file, 0, SEEK_SET);
-            if (rom.ramsize != fread(rom.ram, sizeof(uint8_t), rom.ramsize, save_file)) print_error("Unable to load save file.");
+            if (rom.external_ram_size != fread(rom.external_ram, sizeof(uint8_t), rom.external_ram_size, save_file)) print_error("Unable to load save file.");
         }
         fclose(save_file);
     } else {
@@ -670,12 +670,20 @@ void open_saved_ram(char* filename) {
 
 void close_saved_ram(char* filename) {
     /* Saves emulated RAM to the given save file if such RAM exists. */
-    if (rom.ramsize) {
+    if (rom.external_ram_size) {
         FILE* save_file = fopen(filename, "wb");
         if (save_file == NULL) {
             fprintf(stderr, "Unable to save external RAM to save file.\n");
         }
-        fwrite(rom.ram, sizeof(uint8_t), rom.ramsize, save_file);
+        fwrite(rom.external_ram, sizeof(uint8_t), rom.external_ram_size, save_file);
         fclose(save_file);
     }
+}
+
+
+void free_rom_data(void) {
+    /* Close malloc'd rom and ram arrays */
+    free(rom.rom_data);
+    free(rom.external_ram);
+    free(ram);
 }

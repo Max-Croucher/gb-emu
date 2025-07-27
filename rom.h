@@ -30,8 +30,8 @@ enum MBCType {
 typedef struct {
     uint8_t sgbflag;
     uint8_t mbc_type;
-    uint8_t* rom;
-    uint8_t* ram;
+    uint8_t* rom_data;
+    uint8_t* external_ram;
     uint8_t locale;
     uint8_t old_licensee;
     uint8_t version;
@@ -39,8 +39,8 @@ typedef struct {
     bool has_battery;
     bool has_timer;
     uint16_t new_licensee;
-    int ramsize;
-    int romsize;
+    int external_ram_size;
+    int rom_size;
     char title[16];
 } gbRom;
 
@@ -51,5 +51,6 @@ void init_ram(void);
 char* replace_file_extension(char* filename, char* extension);
 void open_saved_ram(char* filename);
 void close_saved_ram(char* filename);
+void free_rom_data(void);
 
 #endif // ROM_H

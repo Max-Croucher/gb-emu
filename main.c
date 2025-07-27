@@ -237,11 +237,6 @@ int main(int argc, char *argv[]) {
         fclose(f);
         fclose(logfile);
     }
-
-    //free mallocs
-    free(rom.rom);
-    free(rom.ram);
-    free(ram);
-
+    free_rom_data();
     return 0;
 }
