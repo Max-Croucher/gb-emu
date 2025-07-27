@@ -42,6 +42,7 @@ This project is for my own learning and experience, and is therefore written wit
  - `--debug` will cause the emulator to write a detailed log of the CPU state before every instruction is executed.
  - `--tilemap` will open a second window that displays the contents of VRAM, tilemaps and OAM. This window is updated every frame.
  - `--scanline` will also open the second window, but will update the window every scanline. Waits for newlines in STDIN to draw the next scanline.
+ - `--skip-frames <int>` will cause the debugger to skip a given number of frames before waiting for input;
  - `--green` will swap the screen's palette for the original gameboy's universally loved puke green colours.
  - `--no-audio` will completely disable the audio engine.
  - `--export-wav` will enable the output of the gameboy's four audio channels to a 4-channel wav file

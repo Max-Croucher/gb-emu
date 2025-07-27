@@ -83,6 +83,7 @@ void decode_launch_args(int argc, char *argv[]) {
             if (i<argc-1) {
                 save_filename = argv[i+1];
                 do_custom_save_name = 1;
+                i++;
             }
         }
         if (!strcmp(argv[i], "--max-speed")) hyperspeed = 1;
@@ -93,6 +94,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--skip-frames")) {
             if (i<argc-1) {
                 debug_frameskip = atol(argv[i+1]);
+                i++;
             }
         }
         if (!strcmp(argv[i], "--green")) dmg_colours = 1;
