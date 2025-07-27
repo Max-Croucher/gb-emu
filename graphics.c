@@ -64,7 +64,7 @@ uint8_t priority_object[SCREEN_WIDTH];
 bool old_stat_state = 0;
 bool lcd_enable = 0;
 bool debug_used_objects[40] = {0};
-int debug_frameskip = 1;
+int debug_frameskip = 0; //extern
 int debug_frames_done = 0;
 
 
@@ -275,6 +275,8 @@ void gl_tick_debug_window(void) {
     draw_text(0.16,0.57, GLUT_BITMAP_9_BY_15, string);
     sprintf(string, "OBP0|OBP1 = 0x%.2X | 0x%.2X", *(ram+REG_OBP0), *(ram+REG_OBP1));
     draw_text(0.16,0.54, GLUT_BITMAP_9_BY_15, string);
+    sprintf(string, "Frames Rendered: %d", debug_frames_done);
+    draw_text(0.16,0.51, GLUT_BITMAP_9_BY_15, string);
 
     draw_text(0.00222,0.4, GLUT_BITMAP_9_BY_15, "0x00");
     draw_text(1.6/9,0.4, GLUT_BITMAP_9_BY_15, "0x08");
@@ -850,7 +852,7 @@ static void debug_tilemaps(void) {
         bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+SCREEN_WIDTH)] [1] = 0;
         bg_tilemap[255-(uint8_t)(*(ram+REG_SCY)+y)]   [(uint8_t)(*(ram+REG_SCX)+SCREEN_WIDTH)] [2] = 0;
     }
-    if (debug_scanlines) {
+    if (debug_scanlines && debug_frames_done >= debug_frameskip) {
         for (int x=0; x<161; x++) {
             bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [0] = 0;
             bg_tilemap[(uint8_t)(254-bg_scanline)]                  [(uint8_t)(*(ram+REG_SCX)+x)]   [1] = 0;
@@ -970,7 +972,6 @@ bool tick_graphics(void) {
             if (frame_by_frame) {
                 if (debug_frames_done >= debug_frameskip) {
                     getchar();
-                    (void)! scanf("\n");
                 }
             } else {
                 framerate();
@@ -986,17 +987,14 @@ bool tick_graphics(void) {
             draw_background();
             draw_window();
             draw_objects();
-            if (debug_scanlines) {
+            if (debug_scanlines && debug_frames_done >= debug_frameskip) {
                 debug_tile_boundaries();
             }
 
         } else if ((*(ram+REG_LY) < SCREEN_HEIGHT) && (dot % 456) == 232) { // Enter Hblank
             *(ram+REG_STAT) &= 0xFC; // set ppu mode to 0
-            if (debug_scanlines) {
-                if (debug_frames_done >= debug_frameskip) {
-                    getchar();
-                    (void)! scanf("\n");
-                }
+            if (debug_scanlines && debug_frames_done >= debug_frameskip) {
+                getchar();
                 glutMainLoopEvent();
                 glutPostRedisplay();
                 glutSetWindow(WindowDebug);

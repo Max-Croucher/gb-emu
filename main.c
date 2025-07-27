@@ -69,6 +69,7 @@ extern void (*scheduled_instructions[10])(void);
 extern uint8_t num_scheduled_instructions;
 extern uint8_t current_instruction_count;
 extern bool do_export_wav;
+extern int debug_frameskip;
 
 
 void decode_launch_args(int argc, char *argv[]) {
@@ -80,7 +81,7 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--no-save")) do_save_game = 0;
         if (!strcmp(argv[i], "--custom-filename")) {
             if (i<argc-1) {
-                save_filename = argv[i];
+                save_filename = argv[i+1];
                 do_custom_save_name = 1;
             }
         }
@@ -89,6 +90,11 @@ void decode_launch_args(int argc, char *argv[]) {
         if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
         if (!strcmp(argv[i], "--tilemap")) debug_tilemap = 1;
         if (!strcmp(argv[i], "--scanline")) {debug_tilemap = 1; debug_scanlines = 1;}
+        if (!strcmp(argv[i], "--skip-frames")) {
+            if (i<argc-1) {
+                debug_frameskip = atol(argv[i+1]);
+            }
+        }
         if (!strcmp(argv[i], "--green")) dmg_colours = 1;
         if (!strcmp(argv[i], "--frame-by-frame")) frame_by_frame = 1;
         if (!strcmp(argv[i], "--no-audio")) no_audio = 1;
