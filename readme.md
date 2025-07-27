@@ -18,7 +18,6 @@ This project is for my own learning and experience, and is therefore written wit
  - Pass more Blargg and Mooneye tests
  - Implement accurate ppu scanline timing
  - Correctly mask register reads and writes
- - Add the ability to output a screenshot on breakpoint
  - Refactor objects on the address bus
  - Fix some dma edge cases
  - Implement MBC3 clock support
@@ -35,6 +34,7 @@ This project is for my own learning and experience, and is therefore written wit
  The following command line arguments are also available:
  - `--halt-on-breakpoint` will cause the emulator to stop when the instruction `LD B B` is encountered and print the contents of the CPU's registers.
  - `--print-breakpoint` will cause the emulator to print the contents of the CPU's registers when the instruction `LD B B` is encountered, but not stop.
+ - `--screenshot-on-halt` will cause the emulator to save a screenshot when the program halts. When used in conjunction with --halt-on-breakpoint, this is useful for automating testing.
  - `--no-save` will prevent the emulator from saving the contents of external RAM (if applicable) to a file
  - `--custom-filename <filename>` will cause the emulator to save the contents of external RAM to the specified file. This file defaults to `rom-filename.sav`
  - `--max-speed` removes the 59.7Hz limit, allowing the emulator to run as fast as it can.

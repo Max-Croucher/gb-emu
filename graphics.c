@@ -422,7 +422,7 @@ void window_closed(void) {
 }
 
 
-static void take_screenshot(const char *filename) {
+void take_screenshot(char *filename) {
     /* take a screenshot by writing the global array 'texture' to a png */    
     FILE *png_file = fopen(filename, "wb");
     if (!png_file) { // opening file failed
@@ -455,7 +455,7 @@ static void take_screenshot(const char *filename) {
     png_byte **row_pointers = png_malloc(png_ptr, SCREEN_HEIGHT * sizeof(png_byte *));
     for (uint8_t y = 0; y < SCREEN_HEIGHT; y++) {
         row_pointers[y] = png_malloc(png_ptr, sizeof(uint8_t) * SCREEN_WIDTH * 3);
-        memcpy(row_pointers[y], texture[y], SCREEN_WIDTH * sizeof(uint8_t) * 3);
+        memcpy(row_pointers[y], texture[SCREEN_HEIGHT-y-1], SCREEN_WIDTH * sizeof(uint8_t) * 3);
     }
     
     png_init_io(png_ptr, png_file);

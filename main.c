@@ -52,6 +52,7 @@ bool no_audio = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
 bool do_custom_save_name = 0;
+bool screenshot_on_halt = 0;
 
 extern uint16_t system_counter;
 extern uint8_t TIMA_overflow_delay;
@@ -75,6 +76,7 @@ void decode_launch_args(int argc, char *argv[]) {
     for (int i=2; i<argc; i++) {
         if (!strcmp(argv[i], "--halt-on-breakpoint")) halt_on_breakpoint = 1;
         if (!strcmp(argv[i], "--print-breakpoint")) print_breakpoints = 1;
+        if (!strcmp(argv[i], "--screenshot-on-halt")) screenshot_on_halt = 1;
         if (!strcmp(argv[i], "--no-save")) do_save_game = 0;
         if (!strcmp(argv[i], "--custom-filename")) {
             if (i<argc-1) {
@@ -218,6 +220,12 @@ int main(int argc, char *argv[]) {
             if (!no_audio) tick_audio();
             //usleep(10);
         }
+    }
+    
+    if (!no_display && screenshot_on_halt) {
+        char* screenshot_filename = replace_file_extension(argv[1], "png");
+        take_screenshot(screenshot_filename);
+        free(screenshot_filename);
     }
 
     if (!no_audio) close_audio();

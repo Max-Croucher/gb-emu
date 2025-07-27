@@ -37,7 +37,7 @@ def main():
     for testfile in testfiles:
         print(f"{testfile}... ", end='')
         try:
-            proc = subprocess.Popen([EMU, testfile, '--max-speed', '--halt-on-breakpoint'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            proc = subprocess.Popen([EMU, testfile, '--halt-on-breakpoint', '--no-save', '--screenshot-on-halt', '--max-speed', '--no-audio'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             proc.wait(TIMEOUT)
         except subprocess.TimeoutExpired:
             print("Timeout")

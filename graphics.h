@@ -22,6 +22,7 @@ void gl_tick_debug_window(void);
 void reshape(int w, int h);
 void init_graphics(int *argc, char *argv[], char rom_title[16]);
 void window_closed(void);
+void take_screenshot(char *filename);
 void key_pressed (unsigned char key, int x, int y);
 void key_released (unsigned char key, int x, int y);
 bool tick_graphics(void);
