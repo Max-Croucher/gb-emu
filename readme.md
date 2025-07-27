@@ -6,9 +6,10 @@ This project is for my own learning and experience, and is therefore written wit
  - Intructions are implemented for machine cycle accuracy
  - Blargg CPU instruction tests
  - Common MBANK controllers (MBC1, MBC2, MBC3 (without clock), MBC5)
+ - Saving game progress by reading/writing external RAM to a save file. This file defaults to a `.sav` and is compatible with other emulators
  - Interrupts and timers
  - Graphics, including the Acid2 test
- - Sound, although sometimes the noise channel sounds wrong.
+ - Sound, although sometimes the noise channel sounds wrong
  - Framerate limiting to 59.7Hz
  - Tilemap viewer and debugger
 
@@ -20,7 +21,7 @@ This project is for my own learning and experience, and is therefore written wit
  - Refactor objects on the address bus
  - Fix some dma edge cases
  - Implement MBC3 clock support
- - Implement the ability to save games and create/use save states
+ - Implement the ability to create/use save states
 
 ## Lofty Goals:
  - GBC support
@@ -32,7 +33,9 @@ This project is for my own learning and experience, and is therefore written wit
  
  The following command line arguments are also available:
  - `--halt-on-breakpoint` will cause the emulator to stop when the instruction `LD B B` is encountered and print the contents of the CPU's registers.
- - `--halt-on-breakpoint` will cause the emulator to print the contents of the CPU's registers when the instruction `LD B B` is encountered, but not stop.
+ - `--print-breakpoint` will cause the emulator to print the contents of the CPU's registers when the instruction `LD B B` is encountered, but not stop.
+ - `--no-save` will prevent the emulator from saving the contents of external RAM (if applicable) to a file
+ - `--custom-filename <filename>` will cause the emulator to save the contents of external RAM to the specified file. This file defaults to `rom-filename.sav`
  - `--max-speed` removes the 59.7Hz limit, allowing the emulator to run as fast as it can.
  - `--windowless` will stop OpenGL from initialising, and stops the PPU from ticking. Useful for automating tests that don't need graphics.
  - `--debug` will cause the emulator to write a detailed log of the CPU state before every instruction is executed.

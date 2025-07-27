@@ -49,6 +49,9 @@ bool hyperspeed = 0;
 bool no_audio = 0;
 bool no_display = 0;
 bool verbose_logging = 0;
+bool do_save_game = 1;
+bool do_custom_save_name = 0;
+char* save_filename;
 
 extern uint16_t system_counter;
 extern uint8_t TIMA_overflow_delay;
@@ -72,6 +75,13 @@ void decode_launch_args(int argc, char *argv[]) {
     for (int i=2; i<argc; i++) {
         if (!strcmp(argv[i], "--halt-on-breakpoint")) halt_on_breakpoint = 1;
         if (!strcmp(argv[i], "--print-breakpoint")) print_breakpoints = 1;
+        if (!strcmp(argv[i], "--no-save")) do_save_game = 0;
+        if (!strcmp(argv[i], "--custom-filename")) {
+            if (i<argc-1) {
+                save_filename = argv[i];
+                do_custom_save_name = 1;
+            }
+        }
         if (!strcmp(argv[i], "--max-speed")) hyperspeed = 1;
         if (!strcmp(argv[i], "--windowless")) no_display = 1;
         if (!strcmp(argv[i], "--debug")) verbose_logging = 1;
@@ -107,6 +117,12 @@ int main(int argc, char *argv[]) {
     decode_launch_args(argc, argv);
     init_ram();
     init_registers();
+
+    if (do_save_game) {
+        if (!do_custom_save_name) save_filename = replace_file_extension(argv[1], "sav");
+        open_saved_ram(save_filename);
+    }
+
     if (!no_audio) init_audio();
     if (!no_display) init_graphics(&argc, argv, rom.title);
     if (verbose_logging) {
@@ -206,7 +222,13 @@ int main(int argc, char *argv[]) {
 
     if (!no_audio) close_audio();
 
-    //write ram contents to a file
+    // write save ram to a file
+    if (do_save_game) {
+        close_saved_ram(save_filename);
+        if (!do_custom_save_name) free(save_filename);
+    }
+
+    // write emulator ram contents to a file
     if (verbose_logging) {
         FILE *f;
         f = fopen("ram_contents.hex", "wb");

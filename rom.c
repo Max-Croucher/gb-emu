@@ -11,6 +11,12 @@
 #include <stdbool.h>
 #include "rom.h"
 
+#ifdef _WIN32
+#define PATH_SPEC = '\\'
+#else
+#define PATH_SPEC = '/'
+#endif
+
 static char *MBANK_NAMES[] = {
   "ROM",
   "MBANK1",
@@ -41,8 +47,6 @@ void (*write_MBANK_register)(uint16_t, uint8_t); //extern
 uint8_t (*read_rom)(uint32_t); //extern
 void (*write_ext_ram)(uint16_t, uint8_t); //extern
 uint8_t (*read_ext_ram)(uint16_t); //extern
-
-
 
 
 void print_error(char errormsg[]) {
@@ -609,4 +613,69 @@ void load_rom(char filename[]) {
     fprintf(stderr,"Successfully loaded rom file.\n");
 	fclose(romfile);
     initialise_rom_address_functions();
+}
+
+
+char* replace_file_extension(char* filename, char* extension) {
+    /* finds the last '.' in a string and returs a new string containing the contents
+    of filename with everything after the last '.' replaced by a new file extension.
+    However, only occurences of '.' AFTER the last path specifier ('/' or '\')*/
+    if (filename == NULL) return NULL;
+    if (extension == NULL) {
+        char* new_filename = malloc(strlen(filename)+1);
+        strcpy(new_filename, filename);
+        return new_filename;
+    }
+    char* period_ptr = strrchr(filename, '.');
+    char* path_spec_ptr = strrchr(filename, '/');
+    uint64_t string_length;
+    uint64_t extension_length = strlen(extension);
+    //printf("got filename %s of length %ld\n", filename, strlen(filename));
+    //printf("got extension %s of length %ld\n", extension, strlen(extension));
+    if (period_ptr == NULL || (path_spec_ptr != NULL && (path_spec_ptr > period_ptr))) {
+        string_length = strlen(filename); // '.' does not appear in filename or only appears before '/'
+        //printf("period not found.\n");
+    } else {
+        string_length = period_ptr - filename; // '.' does appear in filename
+        //printf("period found at position %ld.\n", string_length);
+    }
+    //printf("allocating memory for %ld characters\n", string_length + extension_length + 1);
+    char* new_filename = malloc(string_length + extension_length + 2);
+    memcpy(new_filename, filename, string_length);
+    new_filename[string_length] = '.';
+    memcpy(new_filename+string_length+1, extension, extension_length+1); // include the trailing 0x00 in the copy
+    return new_filename;
+}
+
+
+void open_saved_ram(char* filename) {
+    /* Reads the given save file and copies contents into emulated RAM if such RAM exists.
+    Does nothing if the file doesn't exist */
+    if (rom.ramsize) {
+        FILE* save_file = fopen(filename, "rb");
+        if (save_file != NULL) {
+            fseek(save_file, 0, SEEK_END);
+            size_t file_size = ftell(save_file);
+            if (file_size < rom.ramsize) print_error("Save file is too small.");
+            if (file_size > rom.ramsize) fprintf(stderr, "WARNING: Save file is larger than expected. Proceeding anyway.\n");
+            fseek(save_file, 0, SEEK_SET);
+            if (rom.ramsize != fread(rom.ram, sizeof(uint8_t), rom.ramsize, save_file)) print_error("Unable to load save file.");
+        }
+        fclose(save_file);
+    } else {
+        fprintf(stderr, "Save file does not exist. Will attempt to create a new file when emulator is closed.\n");
+    }
+}
+
+
+void close_saved_ram(char* filename) {
+    /* Saves emulated RAM to the given save file if such RAM exists. */
+    if (rom.ramsize) {
+        FILE* save_file = fopen(filename, "wb");
+        if (save_file == NULL) {
+            fprintf(stderr, "Unable to save external RAM to save file.\n");
+        }
+        fwrite(rom.ram, sizeof(uint8_t), rom.ramsize, save_file);
+        fclose(save_file);
+    }
 }
