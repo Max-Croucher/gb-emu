@@ -9,6 +9,7 @@ This project is for my own learning and experience, and is therefore written wit
  - Saving game progress by reading/writing external RAM to a save file. This file defaults to a `.sav` and is compatible with other emulators
  - Interrupts and timers
  - Graphics, including the Acid2 test
+ - Screenshots can be saved with ctrl+f
  - Sound, although sometimes the noise channel sounds wrong
  - Framerate limiting to 59.7Hz
  - Tilemap viewer and debugger
@@ -17,7 +18,7 @@ This project is for my own learning and experience, and is therefore written wit
  - Pass more Blargg and Mooneye tests
  - Implement accurate ppu scanline timing
  - Correctly mask register reads and writes
- - Add the ability to output a screenshot on command or breakpoint
+ - Add the ability to output a screenshot on breakpoint
  - Refactor objects on the address bus
  - Fix some dma edge cases
  - Implement MBC3 clock support

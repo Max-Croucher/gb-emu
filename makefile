@@ -11,13 +11,13 @@ opcodes.o: opcodes.c opcodes.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@
 rom.o: rom.c rom.h
 	$(CC) -c $(CFLAGS) $< -o $@
-graphics.o: graphics.c graphics.h cpu.h
-	$(CC) -c $(CFLAGS) $< -o $@ -lglut -lGL
+graphics.o: graphics.c graphics.h cpu.h rom.h
+	$(CC) -c $(CFLAGS) $< -o $@ -lglut -lGL -lpng
 audio.o: audio.c audio.h miniaudio.h cpu.h
 	$(CC) -c $(CFLAGS) $< -o $@ -ldl -lpthread -lm
 
 gbemu: main.o cpu.o rom.o opcodes.o graphics.o audio.o
-	$(CC) $(CFLAGS) $^ -o $@ -lglut -lGL -ldl -lpthread -lm
+	$(CC) $(CFLAGS) $^ -o $@ -lglut -lGL -ldl -lpthread -lm -lpng
 
 # Target: clean project.
 .PHONY: clean

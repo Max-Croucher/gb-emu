@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <GL/freeglut.h>
 #include <time.h>
+#include <png.h>
 #include "cpu.h"
 #include "rom.h"
 #include "graphics.h"
@@ -420,6 +421,55 @@ void window_closed(void) {
     LOOP = 0;
 }
 
+
+static void take_screenshot(const char *filename) {
+    /* take a screenshot by writing the global array 'texture' to a png */    
+    FILE *png_file = fopen(filename, "wb");
+    if (!png_file) { // opening file failed
+        return;
+    }
+    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (png_ptr == NULL) { // creating write struct failed
+        fclose(png_file);
+        return;
+    }
+    png_infop png_info = png_create_info_struct(png_ptr);
+    if (png_info == NULL || setjmp(png_jmpbuf(png_ptr))) { // creating info struct failed
+        png_destroy_write_struct(&png_ptr, &png_info);
+        fclose(png_file);
+        return;
+    }
+    
+    png_set_IHDR(
+        png_ptr,
+        png_info,
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        8, // bit depth per channel
+        PNG_COLOR_TYPE_RGB,
+        PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT,
+        PNG_FILTER_TYPE_DEFAULT
+    );
+
+    png_byte **row_pointers = png_malloc(png_ptr, SCREEN_HEIGHT * sizeof(png_byte *));
+    for (uint8_t y = 0; y < SCREEN_HEIGHT; y++) {
+        row_pointers[y] = png_malloc(png_ptr, sizeof(uint8_t) * SCREEN_WIDTH * 3);
+        memcpy(row_pointers[y], texture[y], SCREEN_WIDTH * sizeof(uint8_t) * 3);
+    }
+    
+    png_init_io(png_ptr, png_file);
+    png_set_rows(png_ptr, png_info, row_pointers);
+    png_write_png(png_ptr, png_info, PNG_TRANSFORM_IDENTITY, NULL);
+    
+    // free arrays and clean up
+    for (uint8_t y = 0; y < SCREEN_HEIGHT; y++) {
+        png_free(png_ptr, row_pointers[y]);
+    }
+    png_free(png_ptr, row_pointers);
+}
+
+
 void key_pressed(unsigned char key, int x, int y) {
     /* handle keys being pressed */
     bool has_changed = 0;
@@ -429,6 +479,16 @@ void key_pressed(unsigned char key, int x, int y) {
         {
         case 's': // ctrl + s (save external RAM)
             if (do_save_game) save_external_ram(save_filename);
+            break;
+        case 'f':; // ctrl + f (take screenshot)
+            time_t curr_time = time(NULL);
+            struct tm time_struct; memset(&time_struct, 0, sizeof(time_struct));
+            gmtime_r(&curr_time, &time_struct);
+            char timestamp_filename[64];
+            sprintf(timestamp_filename, "screenshot_%04d-%02d-%02d_%02d.%02d.%02d.png\n",
+                1900+time_struct.tm_year, time_struct.tm_mon+1, time_struct.tm_mday, time_struct.tm_hour, time_struct.tm_min, time_struct.tm_sec);
+            take_screenshot(timestamp_filename);
+            break;
         }
 
     } else if (keyboard_modifiers) {
