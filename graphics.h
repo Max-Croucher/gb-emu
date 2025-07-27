@@ -19,7 +19,8 @@ typedef struct {
 
 void gl_tick(void);
 void gl_tick_debug_window(void);
-void reshape(int w, int h);
+void reshape_window_ratio(int w, int h);
+void reshape_window_free(int w, int h);
 void init_graphics(int *argc, char *argv[], char rom_title[16]);
 void window_closed(void);
 void take_screenshot(char *filename);

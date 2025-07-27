@@ -339,7 +339,7 @@ void gl_tick_debug_window(void) {
 }
 
 
-void reshape_window(int w, int h) {
+void reshape_window_ratio(int w, int h) {
     /* Ensure window is accurately scaled */
     if (w * SCREEN_HEIGHT > h * SCREEN_WIDTH) { // window is too wide
         int target_width = (h * SCREEN_WIDTH) / SCREEN_HEIGHT;
@@ -350,6 +350,18 @@ void reshape_window(int w, int h) {
         int border = (h - target_height) / 2;
         glViewport(0,border,(GLsizei)w, (GLsizei)(target_height));
     }
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0,1,0,1,-1.0,1.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+
+void reshape_window_free(int w, int h) {
+    /* Ensure window is accurately scaled */
+    glViewport(0,0,(GLsizei)w, (GLsizei)h);
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -386,7 +398,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
     glClearColor(0.0,0.0,0.0,0.0);
     glShadeModel(GL_FLAT);
     glutDisplayFunc(gl_tick);
-    glutReshapeFunc(reshape_window);
+    glutReshapeFunc(reshape_window_ratio);
     blank_screen();
     glutKeyboardFunc(key_pressed);
     glutKeyboardUpFunc(key_released);
@@ -401,7 +413,7 @@ void init_graphics(int *argc, char *argv[], char rom_title[16]) {
         glClearColor(0.9,0.9,0.9,0.0);
         glShadeModel(GL_FLAT);
         glutDisplayFunc(gl_tick_debug_window);
-        glutReshapeFunc(reshape_window);
+        glutReshapeFunc(reshape_window_free);
         glutKeyboardFunc(key_pressed);
         glutKeyboardUpFunc(key_released);
         glutCloseFunc(window_closed);
